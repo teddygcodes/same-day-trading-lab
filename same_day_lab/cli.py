@@ -87,7 +87,11 @@ def _cmd_ingest(args) -> int:
             print(f"ingest failed: {exc}", file=sys.stderr)
             return 1
     else:
-        payload = fixture.load_fixture(args.symbol, args.date)
+        try:
+            payload = fixture.load_fixture(args.symbol, args.date)
+        except fixture.FixtureNotFound as exc:
+            print(f"ingest failed: {exc}", file=sys.stderr)
+            return 1
 
     effective_date = payload["session_date"]
     archived = archive_raw(
