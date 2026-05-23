@@ -25,6 +25,11 @@ def _local_to_utc(date: str, hhmm: str, tz: ZoneInfo) -> datetime:
     return datetime(y, mo, d, h, m, tzinfo=tz).astimezone(timezone.utc)
 
 
+def market_time_to_utc(date: str, hhmm: str, config: dict) -> datetime:
+    """Convert a wall-clock ``HH:MM`` in the configured market timezone to UTC."""
+    return _local_to_utc(date, hhmm, ZoneInfo(config["market_timezone"]))
+
+
 def session_bounds(payload: dict, config: dict) -> dict:
     """Resolve session open/close/flatten (UTC) and the expected RTH bar count.
 
