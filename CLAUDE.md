@@ -57,7 +57,10 @@ metrics or marketing language to reports.
    determinism test for any new analytical output.
 7. **Provenance:** archive the verbatim raw payload with a content hash *before*
    normalization; SQLite is the store; the **DATA WARNING** is the first block of every
-   report.
+   report. **Never fabricate or silently substitute data** — missing minutes are
+   surfaced, never filled, and the fixture loader resolves a requested `(symbol, date)`
+   to its recorded/known file or **raises**; it must not serve the sample day for an
+   unmapped date.
 8. **Time:** all stored timestamps are timezone-aware UTC, ISO-8601 with offset. The
    market timezone (`America/New_York`) is used only for session bounds and
    `reconstruct --time`. Convert via `zoneinfo` (DST matters — half-days are EST).
@@ -73,6 +76,17 @@ naive re-pricing) → `fills/sweep` → `reports/writer` (JSON+MD) → `reports/
 Key modules: `replay/clock.py` + `replay/view.py` (firewall), `replay/__init__.py`
 (`run_replay` orchestration + same-bar guard), `fills/pessimistic.py` (canonical path),
 `reports/verdict.py` (PASS gate). CLI in `cli.py` only parses args and dispatches.
+
+## Quality gating (v0.2)
+
+A run is `INVALID_DATA` on: suspicious OHLC, duplicate bars, missing RTH minutes beyond
+`quality.missing_bar_policy.max_missing_fatal`, or a **partial session** (a leading or
+trailing missing run that reaches a session edge with length ≥ `halt_run_min_consecutive`
+— the feed never covered the full session). **Non-fatal** (flagged + surfaced, never
+invalidating): missing minutes within tolerance, `halt_suspected` (an *interior*
+consecutive-missing run), zero volume, extreme single-bar moves, stale repeats. IEX
+legitimately omits no-trade minutes — that is why scattered gaps are non-fatal. Split/
+adjustment detection is still deferred (needs multi-day prior-close context).
 
 ## Dev workflow
 
@@ -104,5 +118,6 @@ same-day-lab reconstruct --symbol AAPL --date 2025-05-15 --time "10:32"   # --ti
 ## Layout
 
 `same_day_lab/{ingest,storage,quality,replay,strategy,fills,reports}/` · `config/default.yaml`
-· `fixtures/` · `tools/gen_fixture.py` · `tests/` · `docs/prompts/` (build prompts) ·
-generated artifacts in `data/` and `reports/` are gitignored.
+· `fixtures/` (sample, half-day, messy-real) · `tools/{gen_fixture,record_real_day}.py` ·
+`tests/` · `docs/prompts/` (build prompts) · generated artifacts in `data/` and
+`reports/` are gitignored.

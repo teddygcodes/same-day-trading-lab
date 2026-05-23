@@ -56,17 +56,34 @@ pytest                       # all tests run offline, no network
 
 Fixtures live in `fixtures/` and are the default provider. No credentials needed.
 
-### With Alpaca (optional, live historical bars)
+### With Alpaca (optional, real IEX historical bars)
+
+Set creds, then either ingest directly or — recommended — **record a real day into an
+offline fixture** so the run is reproducible and the suite stays offline:
 
 ```bash
 cp .env.example .env         # then set ALPACA_API_KEY / ALPACA_SECRET_KEY
 export ALPACA_API_KEY=...  ALPACA_SECRET_KEY=...
-same-day-lab ingest --provider alpaca --symbol AAPL --date 2025-05-15
+
+# one-shot live ingest:
+same-day-lab ingest --provider alpaca --symbol AAPL --date 2025-06-13
+
+# or record-and-replay (capture the real day, then replay it offline):
+python tools/record_real_day.py --symbol AAPL --date 2025-06-13   # -> fixtures/real_aapl_2025-06-13_iex.json
+same-day-lab ingest --provider fixture --symbol AAPL --date 2025-06-13
+same-day-lab run     --symbol AAPL --date 2025-06-13
 ```
 
+The fixture loader resolves a `(symbol, date)` to a recorded `real_<symbol>_<date>_iex.json`
+(or a known synthetic fixture) and **raises rather than silently serving the sample** for
+an unmapped date. The three synthetic fixture dates — `2025-05-15` (sample), `2025-11-28`
+(half-day), `2025-06-16` (messy-real) — are reserved; pick any *other* real trading day
+for a real pull.
+
 If creds are missing, `--provider alpaca` fails gracefully and tells you to use
-`--provider fixture`. (The live HTTP path is intentionally not covered by the
-offline test suite.)
+`--provider fixture`. The Alpaca client sends `adjustment=raw`, maps 401/403/429/empty to
+clear messages, and retries once on a 429. The live HTTP path is intentionally not
+covered by the offline test suite.
 
 ## Commands
 
@@ -103,6 +120,24 @@ deterministic JSON + Markdown report → verdict.
 - **Friction sweep:** re-runs the pessimistic simulation across a cents × bps grid
   and reports the **crossover** — the friction at which pessimistic P&L turns
   non-positive.
+
+## Data quality
+
+Real IEX data legitimately omits no-trade minutes, so v0.1's "zero missing bars" rule is
+replaced by a tolerance policy (`config/default.yaml` → `quality.missing_bar_policy`):
+
+- **Missing RTH minutes** are non-fatal up to `max_missing_fatal` (default 30); beyond
+  that the run is `INVALID_DATA`. The count and timestamps are surfaced in every report.
+- **`halt_suspected`** — an *interior* consecutive-missing run ≥ `halt_run_min_consecutive`
+  (default 10) — is flagged but **non-fatal**.
+- **`partial_session`** — a leading/trailing missing run reaching a session edge — means
+  the feed never covered the full session, and stays **fatal**.
+- Suspicious OHLC and duplicate bars are always fatal. **Bars are never fabricated** to
+  fill gaps. (Split/adjustment detection is deferred — it needs multi-day context.)
+
+The `messy_real_aapl_1m.json` fixture (scattered gaps, an interior halt run, an
+extreme-move bar, a zero-volume bar) exercises this end-to-end and still replays to a
+deterministic, non-fatal report.
 
 ## How to read the report
 
