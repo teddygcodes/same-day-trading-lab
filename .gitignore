@@ -1,0 +1,21 @@
+# venv / build
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# generated artifacts (keep dirs via .gitkeep, fixtures are committed)
+*.sqlite3
+data/raw/*
+!data/raw/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# env / secrets
+.env

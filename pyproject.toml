@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "same-day-trading-lab"
+version = "0.1.0"
+description = "Deterministic historical-replay fill-honesty lab for intraday equity research (v0.1)"
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6", "tzdata>=2024.1"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+same-day-lab = "same_day_lab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["same_day_lab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

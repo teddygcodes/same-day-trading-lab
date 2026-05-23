@@ -1,0 +1,54 @@
+symbol: AAPL
+date: "2025-05-15"        # recent historical trading date, overridable
+provider: fixture
+market_timezone: America/New_York
+
+session:
+  regular_open: "09:30"
+  regular_close: "16:00"
+  flatten_time: "15:59"
+
+orb:
+  opening_range_minutes: 5
+  trigger: close_above_or_high
+  one_trade_per_day: true
+  stop: opposite_side_of_opening_range   # = OR low
+  # FIX #2: target geometry is explicit. R is defined as (entry - stop).
+  # target_price = entry + target_r_multiple * (entry - stop)
+  target_r_multiple: 1.0
+  target_basis: risk_multiple_from_entry   # NOT or_height; see strategy section
+  flatten_by_close: true
+
+fills:
+  naive:
+    enabled: true
+    # FIX #1: naive entry/exit prices pinned, no ambiguity
+    entry_price: trigger_close      # the close that fired the signal
+    exit_price: exact_level         # exact stop/target/flatten level, zero slippage
+  pessimistic:
+    enabled: true
+    entry_slippage_cents: 2
+    entry_slippage_bps: 5
+    exit_slippage_cents: 2
+    exit_slippage_bps: 5
+    stop_wins_ambiguous_bar: true
+    no_same_bar_fills: true
+    # FIX #3: removed the misleading fill_on_next_bar_open boolean.
+    # Entry reference is fully defined by the formula in the strategy section:
+    #   entry = max(next_bar_open, trigger_price) + adverse_slippage
+    entry_reference: next_bar_open_or_trigger_worse
+  friction_sweep:
+    cents: [0, 1, 2, 5, 10]
+    bps: [0, 5, 10, 15]
+
+quality:
+  expected_bar_seconds: 60
+  allow_extended_hours: false
+  max_missing_bars: 0
+  extreme_move_pct: 5.0
+  stale_repeat_min_consecutive: 3   # FIX #5: N identical consecutive OHLCV = stale
+
+verdict:
+  min_friction_cents_to_pass: 5
+  require_pessimistic_profit_for_pass: true
+  naive_cannot_pass: true
