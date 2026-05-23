@@ -125,6 +125,58 @@ def gen_half_day() -> dict:
     }
 
 
+def gen_messy() -> dict:
+    """Full RTH day resembling real IEX data: scattered missing minutes, one
+    interior halt-like run (>= halt threshold), an extreme-move bar, and a
+    zero-volume bar. Deterministic, OHLC-valid, and still produces the ORB trade."""
+    base = _open_utc("2025-06-16")              # Mon, EDT -> 13:30Z .. 20:00Z (390-min grid)
+    drop = set(range(200, 212)) | {75, 150, 250, 330}     # 12-min interior halt + 4 scattered = 16
+    overrides = {                                # (o, h, l, c, v) for special bars
+        120: (100.15, 106.00, 100.10, 100.20, 5000),      # extreme move: range ~5.9% > 5% (non-fatal)
+        180: (100.15, 100.16, 100.14, 100.15, 0),         # zero volume (non-fatal)
+    }
+    assert 0 not in drop and 389 not in drop, "open/close edges must stay covered"
+
+    bars = []
+    for i in range(390):
+        if i in drop:
+            continue
+        t = base + timedelta(minutes=i)
+        if i in overrides:
+            o, h, l, c, v = overrides[i]
+            bars.append(_bar(t, o, h, l, c, v=v))
+            continue
+        if i in EXPLICIT:
+            o, h, l, c = EXPLICIT[i]
+        elif i <= 60:
+            frac = (i - 19) / (60 - 19)
+            mid = 100.66 - frac * (100.66 - 100.20)
+            o, c = mid + 0.01, mid - 0.01
+            h, l = min(mid + 0.05, 100.69), max(mid - 0.05, 100.06)
+        else:
+            mid = 100.15
+            o, c = mid + 0.02, mid
+            h, l = mid + 0.06, mid - 0.05
+        bars.append(_bar(t, o, h, l, c))
+
+    # invariants the messy fixture relies on
+    for b in bars:
+        assert b["l"] <= b["o"] <= b["h"], b
+        assert b["l"] <= b["c"] <= b["h"], b
+        assert b["l"] <= b["h"], b
+        assert b["v"] >= 0, b
+    assert sum(1 for b in bars if b["v"] == 0) == 1, "exactly one zero-volume bar"
+    assert len(bars) == 390 - len(drop)          # = 374; no fabrication, gaps stay gaps
+    return {
+        "symbol": "AAPL",
+        "session_date": "2025-06-16",
+        "timeframe": "1Min",
+        "feed": "fixture",
+        "is_half_day": False,
+        "bars": bars,
+    }
+
+
 def _assert_valid(bars, *, expected):
     assert len(bars) == expected, (len(bars), expected)
     for b in bars:
@@ -140,7 +192,10 @@ def main():
         json.dump(gen_sample(), f, indent=2)
     with open(os.path.join(OUT, "half_day_aapl_1m.json"), "w") as f:
         json.dump(gen_half_day(), f, indent=2)
+    with open(os.path.join(OUT, "messy_real_aapl_1m.json"), "w") as f:
+        json.dump(gen_messy(), f, indent=2)
     print("wrote fixtures/sample_aapl_1m_day.json and fixtures/half_day_aapl_1m.json")
+    print("wrote fixtures/messy_real_aapl_1m.json")
 
 
 if __name__ == "__main__":

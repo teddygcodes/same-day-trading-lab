@@ -16,6 +16,7 @@ FIXTURES_DIR = os.path.join(
 _FIXTURE_FILES = {
     ("AAPL", "2025-05-15"): "sample_aapl_1m_day.json",
     ("AAPL", "2025-11-28"): "half_day_aapl_1m.json",
+    ("AAPL", "2025-06-16"): "messy_real_aapl_1m.json",
 }
 
 
