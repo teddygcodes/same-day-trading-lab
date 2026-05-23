@@ -175,6 +175,16 @@ def _markdown(report) -> str:
     lines.append(f"- Ingest: `{r['ingest_run_id']}`  raw_hash: `{r['raw_hash'][:16]}…`")
     lines.append(f"- Bars expected/actual: {r['bars']['expected']}/{r['bars']['actual']}")
     lines.append(f"- Data valid: {r['data_valid']}" + (f" — reasons: {r['data_reasons']}" if r["data_reasons"] else ""))
+    qs = r.get("quality_summary") or {}
+    mb = qs.get("missing_bar_count", 0)
+    if mb or qs.get("halt_suspected"):
+        halt = qs.get("halt_runs") or []
+        suffix = f"  — halt_suspected: {len(halt)} run(s) ≥ threshold" if qs.get("halt_suspected") else ""
+        lines.append(f"- Missing RTH minutes: **{mb}** (gaps are not fabricated){suffix}")
+        shown = qs.get("missing_bars", [])[:12]
+        if shown:
+            more = "" if len(qs.get("missing_bars", [])) <= 12 else f" … (+{len(qs['missing_bars']) - 12} more)"
+            lines.append(f"  - missing: {', '.join(shown)}{more}")
     lines.append("")
 
     if r["opening_range"]:
