@@ -83,7 +83,7 @@ def _cmd_ingest(args) -> int:
     if args.provider == "alpaca":
         try:
             payload = alpaca.fetch_bars(args.symbol, args.date, config)
-        except alpaca.AlpacaCredentialsMissing as exc:
+        except (alpaca.AlpacaCredentialsMissing, alpaca.AlpacaError) as exc:
             print(f"ingest failed: {exc}", file=sys.stderr)
             return 1
     else:
