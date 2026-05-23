@@ -1,9 +1,11 @@
 """Aggregate per-bar and session-level quality flags into a summary + validity verdict.
 
-Fatal issues (mark a run INVALID_DATA): suspicious OHLC, missing bars beyond the
-configured tolerance, duplicate bars, or a partial session (fewer RTH bars than the
-half-day-aware expected grid). Non-fatal issues (flagged, not invalidating in v0.1):
-zero volume, extreme single-bar moves, stale repeats, out-of-session bars.
+Fatal issues (mark a run INVALID_DATA): suspicious OHLC, missing RTH minutes beyond
+``missing_bar_policy.max_missing_fatal``, duplicate bars, or a partial session (a
+leading/trailing missing run >= ``halt_run_min_consecutive`` — the feed never covered
+the full session). Non-fatal (flagged, not invalidating): missing minutes within
+tolerance, ``halt_suspected`` (an interior consecutive-missing run), zero volume,
+extreme single-bar moves, stale repeats, out-of-session bars.
 """
 
 from . import flags
@@ -15,6 +17,7 @@ def evaluate(bars, session, config):
     ``per_bar_flags`` maps ``bar_start_ts`` -> tuple of flag names.
     """
     q = config["quality"]
+    policy = q["missing_bar_policy"]
     rth_bars = [b for b in bars if b.is_regular_market_hours]
 
     per_bar: dict = {b.bar_start_ts: [] for b in bars}
@@ -43,7 +46,8 @@ def evaluate(bars, session, config):
         for ts in run:
             if ts in per_bar:
                 per_bar[ts].append("stale_repeat")
-    is_partial = flags.partial_session(len(rth_bars), session)
+    halt_runs = flags.find_halt_runs(missing, session, policy["halt_run_min_consecutive"])
+    is_partial = flags.partial_session(missing, session, policy["halt_run_min_consecutive"])
 
     summary = {
         "bar_count": len(bars),
@@ -51,6 +55,8 @@ def evaluate(bars, session, config):
         "bar_count_expected": session.bar_count_expected,
         "missing_bar_count": len(missing),
         "missing_bars": [t.isoformat() for t in missing],
+        "halt_suspected": bool(halt_runs),
+        "halt_runs": [[t.isoformat() for t in run] for run in halt_runs],
         "duplicate_bars": [t.isoformat() for t in duplicates],
         "stale_repeat_runs": [[t.isoformat() for t in run] for run in stale_runs],
         "partial_session": is_partial,
@@ -63,15 +69,19 @@ def evaluate(bars, session, config):
     reasons = []
     if suspicious:
         reasons.append(f"{suspicious} suspicious OHLC bar(s)")
-    if len(missing) > q["max_missing_bars"]:
-        reasons.append(f"{len(missing)} missing bar(s) > max_missing_bars={q['max_missing_bars']}")
+    if len(missing) > policy["max_missing_fatal"]:
+        reasons.append(
+            f"{len(missing)} missing bar(s) > max_missing_fatal={policy['max_missing_fatal']}"
+        )
     if duplicates:
         reasons.append(f"{len(duplicates)} duplicate bar timestamp(s)")
     if is_partial:
         reasons.append(
-            f"partial session: {len(rth_bars)} RTH bars < expected {session.bar_count_expected}"
+            f"partial session: leading/trailing gap >= "
+            f"{policy['halt_run_min_consecutive']} min (feed did not cover full session)"
         )
     data_valid = not reasons
+    # halt_suspected is deliberately NON-fatal: recorded in summary, never added to reasons.
 
     per_bar_flags = {ts: tuple(v) for ts, v in per_bar.items()}
     return per_bar_flags, summary, data_valid, reasons

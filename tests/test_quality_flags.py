@@ -92,8 +92,36 @@ def test_extreme_move_fires_above_pct():
     assert flags.flag_extreme_move(make_bar(utc(), 100.0, 102.0, 100.0, 101.0), 5.0) is False
 
 
-def test_partial_session_true_when_fewer_than_expected():
-    s = _session(utc(), utc(h=16), expected=390, actual=200)
-    assert flags.partial_session(200, s) is True
-    full = _session(utc(), utc(h=16), expected=390, actual=390)
-    assert flags.partial_session(390, full) is False
+def test_partial_session_fires_on_trailing_truncation():
+    open_ts = utc(h=13, minute=30)
+    close_ts = utc(h=14, minute=10)            # 40-min grid; last slot = 14:09
+    missing = [open_ts + timedelta(minutes=m) for m in range(30, 40)]  # trailing run of 10 -> 14:09
+    s = _session(open_ts, close_ts, expected=40, actual=30)
+    assert flags.partial_session(missing, s, min_consecutive=10) is True
+
+
+def test_partial_session_silent_on_interior_gap():
+    open_ts = utc(h=13, minute=30)
+    close_ts = utc(h=14, minute=10)
+    missing = [open_ts + timedelta(minutes=m) for m in range(15, 25)]  # interior run of 10
+    s = _session(open_ts, close_ts, expected=40, actual=30)
+    assert flags.partial_session(missing, s, min_consecutive=10) is False
+
+
+def test_halt_run_detected_interior_and_nonfatal():
+    open_ts = utc(h=13, minute=30)
+    close_ts = utc(h=14, minute=10)
+    s = _session(open_ts, close_ts, expected=40, actual=30)
+    missing = [open_ts + timedelta(minutes=m) for m in range(15, 25)]  # interior 10-run
+    halts = flags.find_halt_runs(missing, s, min_consecutive=10)
+    assert len(halts) == 1 and len(halts[0]) == 10
+
+
+def test_halt_run_silent_on_scattered_and_on_edge():
+    open_ts = utc(h=13, minute=30)
+    close_ts = utc(h=14, minute=10)
+    s = _session(open_ts, close_ts, expected=40, actual=36)
+    scattered = [open_ts + timedelta(minutes=m) for m in (16, 20, 24, 28)]
+    assert flags.find_halt_runs(scattered, s, min_consecutive=10) == []
+    edge = [open_ts + timedelta(minutes=m) for m in range(30, 40)]  # trailing edge run
+    assert flags.find_halt_runs(edge, s, min_consecutive=10) == []  # edge run is truncation, not halt

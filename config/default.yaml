@@ -44,7 +44,10 @@ fills:
 quality:
   expected_bar_seconds: 60
   allow_extended_hours: false
-  max_missing_bars: 0
+  # v0.2: IEX bars legitimately miss minutes, so the blunt max_missing_bars: 0 is gone.
+  missing_bar_policy:
+    max_missing_fatal: 30          # > this many missing RTH minutes -> INVALID_DATA
+    halt_run_min_consecutive: 10   # >= N consecutive missing -> halt_suspected (interior) / partial (edge)
   extreme_move_pct: 5.0
   stale_repeat_min_consecutive: 3   # FIX #5: N identical consecutive OHLCV = stale
 

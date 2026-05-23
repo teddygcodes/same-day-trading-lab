@@ -76,6 +76,39 @@ def flag_extreme_move(bar, pct: float) -> bool:
     return (bar.high - bar.low) / bar.open * 100.0 > pct
 
 
-def partial_session(rth_bar_count: int, session) -> bool:
-    """True if fewer RTH bars than the (half-day-aware) expected grid."""
-    return rth_bar_count < session.bar_count_expected
+def _consecutive_runs(missing, *, step_seconds=60) -> list:
+    """Group an ascending list of missing timestamps into maximal consecutive runs."""
+    runs = []
+    for ts in missing:
+        if runs and ts - runs[-1][-1] == timedelta(seconds=step_seconds):
+            runs[-1].append(ts)
+        else:
+            runs.append([ts])
+    return runs
+
+
+def _touches_edge(run, session, *, step_seconds=60) -> bool:
+    last_slot = session.session_close_ts - timedelta(seconds=step_seconds)
+    return run[0] == session.session_open_ts or run[-1] == last_slot
+
+
+def find_halt_runs(missing, session, min_consecutive: int, *, step_seconds=60) -> list:
+    """Interior consecutive-missing runs of >= min_consecutive minutes (non-fatal halts).
+
+    A run anchored at the session open or final grid slot is truncation (see
+    ``partial_session``), not a halt, so it is excluded here.
+    """
+    return [
+        run
+        for run in _consecutive_runs(missing, step_seconds=step_seconds)
+        if len(run) >= min_consecutive and not _touches_edge(run, session, step_seconds=step_seconds)
+    ]
+
+
+def partial_session(missing, session, min_consecutive: int, *, step_seconds=60) -> bool:
+    """True if a leading or trailing missing run >= min_consecutive reaches a session
+    edge — the feed never covered the full session (truncation). Interior gaps do not."""
+    return any(
+        len(run) >= min_consecutive and _touches_edge(run, session, step_seconds=step_seconds)
+        for run in _consecutive_runs(missing, step_seconds=step_seconds)
+    )
