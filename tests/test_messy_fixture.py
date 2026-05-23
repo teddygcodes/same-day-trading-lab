@@ -29,8 +29,13 @@ def test_messy_fixture_replays_to_valid_deterministic_report(tmp_path):
     assert qs["halt_suspected"] is True
     assert len(qs["halt_runs"]) == 1 and len(qs["halt_runs"][0]) == 12
     assert qs["partial_session"] is False
-    # fills exercised
+    # fills exercised, and the extreme-move / zero-volume bars are present + flagged
     assert rep["trade"] is not None
+    assert qs["extreme_move_count"] == 1 and qs["zero_volume_count"] == 1
+    # honesty guard: the friction sweep still crosses zero (the edge dies under
+    # friction). If the extreme-move spike leaked into bars_after_signal it would
+    # be mis-read as a target hit and prop P&L up, erasing the crossover.
+    assert rep["crossover"]["crossover_cents"] is not None
     # NO fabricated bars: present == expected - missing
     assert rep["bars"]["actual"] == rep["bars"]["expected"] - qs["missing_bar_count"]
 

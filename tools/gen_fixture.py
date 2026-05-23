@@ -132,10 +132,16 @@ def gen_messy() -> dict:
     base = _open_utc("2025-06-16")              # Mon, EDT -> 13:30Z .. 20:00Z (390-min grid)
     drop = set(range(200, 212)) | {75, 150, 250, 330}     # 12-min interior halt + 4 scattered = 16
     overrides = {                                # (o, h, l, c, v) for special bars
-        120: (100.15, 106.00, 100.10, 100.20, 5000),      # extreme move: range ~5.9% > 5% (non-fatal)
+        # Extreme-move bar in the PRE-breakout lull: close (100.19) stays below the
+        # OR high (100.20) so it does NOT signal, and being pre-signal it is absent
+        # from bars_after_signal — so the friction sweep's re-simulation can never
+        # mistake its 106 spike for a target hit. It still trips the extreme_move flag.
+        7: (100.18, 106.00, 100.14, 100.19, 5000),        # extreme move (range ~5.9% > 5%, non-fatal)
         180: (100.15, 100.16, 100.14, 100.15, 0),         # zero volume (non-fatal)
     }
     assert 0 not in drop and 389 not in drop, "open/close edges must stay covered"
+    # Guard: any extreme-move override must stay pre-signal (index < breakout at i=10).
+    assert all(i < 10 for i, (o, h, l, c, v) in overrides.items() if (h - l) / o * 100.0 > 5.0)
 
     bars = []
     for i in range(390):
