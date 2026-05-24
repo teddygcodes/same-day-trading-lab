@@ -75,7 +75,9 @@ naive re-pricing) → `fills/sweep` → `reports/writer` (JSON+MD) → `reports/
 
 Key modules: `replay/clock.py` + `replay/view.py` (firewall), `replay/__init__.py`
 (`run_replay` orchestration + same-bar guard), `fills/pessimistic.py` (canonical path),
-`reports/verdict.py` (PASS gate). CLI in `cli.py` only parses args and dispatches.
+`runner.py` (`run_one_day` + `run_range`), `reports/verdict.py` (PASS gate),
+`reports/aggregate.py` (descriptive multi-day rollup). CLI in `cli.py` only parses args
+and dispatches.
 
 ## Quality gating (v0.2)
 
@@ -87,6 +89,17 @@ invalidating): missing minutes within tolerance, `halt_suspected` (an *interior*
 consecutive-missing run), zero volume, extreme single-bar moves, stale repeats. IEX
 legitimately omits no-trade minutes — that is why scattered gaps are non-fatal. Split/
 adjustment detection is still deferred (needs multi-day prior-close context).
+
+## Multi-day (v0.3)
+
+`run-range` replays each ingested day **independently** (its own clock / opening range /
+one-trade-per-day; no carry-over, no compounding, per-share P&L) and emits a
+**descriptive aggregate**: counts, a crossover-cents distribution, and the fill-honesty
+headline (days where naive looked profitable but pessimistic killed it), with a
+deterministic `aggregate_hash`. It is **NOT a portfolio backtester** — no cumulative
+P&L, equity curve, drawdown, or Sharpe/Sortino, and **no aggregate validation verdict**
+(per-day verdicts stand). It runs only over ingested days, surfaces missing weekdays, and
+never fabricates (no market-calendar dependency).
 
 ## Dev workflow
 
@@ -111,6 +124,7 @@ pip install -e ".[test]" && pytest          # offline
 same-day-lab init-db
 same-day-lab ingest --provider fixture --symbol AAPL --date 2025-05-15
 same-day-lab run     --symbol AAPL --date 2025-05-15
+same-day-lab run-range --symbol AAPL --start 2025-07-07 --end 2025-07-11   # per-day independent + aggregate
 same-day-lab report  --symbol AAPL --date 2025-05-15
 same-day-lab reconstruct --symbol AAPL --date 2025-05-15 --time "10:32"   # --time is market tz
 ```

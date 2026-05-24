@@ -76,9 +76,9 @@ same-day-lab run     --symbol AAPL --date 2025-06-13
 
 The fixture loader resolves a `(symbol, date)` to a recorded `real_<symbol>_<date>_iex.json`
 (or a known synthetic fixture) and **raises rather than silently serving the sample** for
-an unmapped date. The three synthetic fixture dates — `2025-05-15` (sample), `2025-11-28`
-(half-day), `2025-06-16` (messy-real) — are reserved; pick any *other* real trading day
-for a real pull.
+an unmapped date. The synthetic fixture dates — `2025-05-15` (sample), `2025-06-16`
+(messy-real), `2025-07-07`…`2025-07-10` (v0.3 multi-day mix), `2025-11-28` (half-day) —
+are reserved; pick any *other* real trading day for a real pull.
 
 If creds are missing, `--provider alpaca` fails gracefully and tells you to use
 `--provider fixture`. The Alpaca client sends `adjustment=raw`, maps 401/403/429/empty to
@@ -162,6 +162,25 @@ itself, produce a PASS.
 `report_hash` covers only the analytical core (OR levels, fills, P&L, sweep,
 crossover, verdict, config hash) and excludes volatile provenance, so the same
 fixture + config always reproduces the same hash.
+
+## Multi-day (run-range)
+
+Replay the same symbol + strategy across a date range, **each day independent** (its own
+opening range and single trade — no carry-over, no compounding):
+
+```bash
+# each day must be ingested first (record_real_day + ingest, or a synthetic fixture)
+same-day-lab run-range --symbol AAPL --start 2025-07-07 --end 2025-07-11
+```
+
+The aggregate (`reports/<symbol>_<start>_<end>_aggregate.{json,md}`) is a **descriptive
+distribution, not a track record**: a per-day table, counts (traded / no-signal /
+INVALID_DATA, naive>0, survived-friction, KILL), a crossover-cents distribution, and the
+**fill-honesty headline** — how many days naive looked profitable but pessimistic fills
+killed it. There is **no aggregate verdict** (per-day verdicts stand) and **no portfolio
+math** (no equity curve, drawdown, or Sharpe). Weekdays in the range with no ingest are
+listed as *missing* (record them, or they were holidays — there is no market calendar).
+`aggregate_hash` makes the rollup deterministic.
 
 ## Why v0.1 is intentionally tiny
 
