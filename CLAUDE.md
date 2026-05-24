@@ -1,5 +1,11 @@
 # CLAUDE.md — same-day-trading-lab
 
+> **RETIRED — frozen at v0.4.** No further build prompts will be executed. v0.5
+> (combinatorial discovery) was charter-considered and prompted (`docs/prompts/v0.5*`) but
+> **never built** — the **Combinatorial discovery (v0.5)** section below describes that
+> *unbuilt* design, not shipped behavior. Everything else describes what exists through v0.4.
+> See the README for the retirement rationale.
+
 Read this before doing anything. It encodes the non-negotiables. When the letter and
 spirit of a request seem to conflict with these invariants, **stop and ask** rather
 than quietly working around them.

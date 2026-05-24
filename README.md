@@ -1,5 +1,13 @@
 # same-day-trading-lab
 
+> **Status: retired — frozen at v0.4.** This lab reached a complete pipeline and a clean
+> *negative* result: across three pre-registered long-only strategies on real AAPL data,
+> none corroborated out-of-sample. A v0.5 combinatorial-discovery layer was designed (see
+> `docs/prompts/`) but **deliberately not built** — mining a ~7,680-candidate space on an
+> IEX-subset feed was poised to be a noise-magnification machine (expected S/N ≈ 1), and
+> retiring on the honest negative result is truer to the lab's purpose than searching for an
+> artifact. Retired in the same disciplined spirit that retired its predecessors, Bob and Glint.
+
 A deterministic, historical-replay **fill-honesty lab** for intraday equity research.
 
 The question it exists to answer:
