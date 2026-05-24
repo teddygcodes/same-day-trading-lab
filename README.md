@@ -37,7 +37,7 @@ Two predecessors were retired. **Glint** (a Kalshi paper bot) taught that the va
 results as deliverables. **Bob** (an Alpaca equity paper bot) produced paper P&L that is
 **not trusted**: paper fills are not truth. This lab copies neither's execution loop and
 treats no modeled fill as achievable. A future bot may only ever execute what the lab
-approves — and so far it approves nothing; it measures friction honestly.
+approves — and it approved nothing. Measuring friction honestly was the point.
 
 ## Why 1-minute bars deceive
 
@@ -203,17 +203,20 @@ a live pull. Without credentials, `--provider alpaca` fails gracefully and point
 `--provider fixture`. The client requests `adjustment=raw`, maps `401/403/429`/empty to clear
 messages, retries once on a 429, and is intentionally not exercised by the offline suite.
 
-## Status & the finding so far
+## Final findings
 
-The pipeline is complete end-to-end: honest fills, no-lookahead replay, friction sweep,
-per-day verdicts, multi-day aggregates, and a holdout tournament — with an offline test suite
-and real AAPL sessions committed under `docs/real-days/`.
+The pipeline shipped complete: honest fills, no-lookahead replay, friction sweep, per-day
+verdicts, multi-day aggregates, and a holdout tournament — with an offline test suite and
+real AAPL sessions committed under `docs/real-days/`.
 
-On the first real evaluation (AAPL; decide `2025-06-02..06-13`, holdout `06-17..06-27`),
-**0 of 3 pre-registered strategies carried forward.** Two looked promising in-sample
-(`vwap_reclaim` and `or_fade` cleared friction on ~50–57% of traded days) but **deflated
-out-of-sample** (to ~38% and 29%). No corroborated edge — the holdout doing exactly its job.
-A negative result, which is the point.
+On the real evaluation (AAPL; decide `2025-06-02..06-13`, holdout `06-17..06-27`), **0 of 3
+pre-registered strategies carried forward.** Two looked promising in-sample (`vwap_reclaim`
+and `or_fade` cleared friction on ~50–57% of traded days) but **deflated out-of-sample**
+(to ~38% and 29%). No corroborated edge — the holdout doing exactly its job.
+
+That clean negative is where the lab retired (see the banner up top): it found no edge, and
+it declined to build the ~7,680-candidate search that would have manufactured one from IEX
+noise. Negative results are deliverables — that was the whole point.
 
 ## Scope & non-goals
 
