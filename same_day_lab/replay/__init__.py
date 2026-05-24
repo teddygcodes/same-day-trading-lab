@@ -16,24 +16,25 @@ def enforce_no_same_bar_fill(*, signal_bar_ts, fill_bar_ts) -> None:
         raise ReplayError(f"same-bar fill detected: signal and fill both at {signal_bar_ts}")
 
 
-def run_replay(rth_bars, config, *, flatten_ts) -> dict:
-    """Replay one RTH session: drive the strategy behind the firewall, fill the
-    one ORB trade (if any) both ways, and run the friction sweep.
+def run_replay(rth_bars, config, *, flatten_ts, strategy=None) -> dict:
+    """Replay one RTH session: drive the selected strategy behind the firewall, fill
+    the one trade (if any) both ways, and run the friction sweep.
 
-    Returns a dict with ``signal`` (EntrySignal | None), ``trade`` (CanonicalTrade
-    | None), ``opening_range``, ``crossover``, and ``replay_valid``. ``flatten_ts``
-    is provided by the caller (from the stored session) so this package needs no
-    dependency on ingest.
+    Returns a dict with ``strategy`` (the registered name), ``signal`` (TradePlan |
+    None), ``trade`` (CanonicalTrade | None), ``strategy_context`` (small dict | None),
+    ``crossover``, and ``replay_valid``. ``flatten_ts`` is provided by the caller (from
+    the stored session) so this package needs no dependency on ingest.
     """
     from ..fills.naive import price_naive
     from ..fills.pessimistic import simulate_pessimistic
     from ..fills.sweep import run_sweep
     from ..models import CanonicalTrade, FillParams
-    from ..strategy.orb_long import OrbLongStrategy
+    from ..strategy import DEFAULT_STRATEGY, get_strategy
     from .clock import ReplayClock
 
+    strategy = strategy or DEFAULT_STRATEGY
     clock = ReplayClock(rth_bars)
-    strat = OrbLongStrategy(config["orb"])
+    strat = get_strategy(strategy).from_config(config)
     signal = None
     while not clock.is_done():
         clock.advance()
@@ -41,8 +42,9 @@ def run_replay(rth_bars, config, *, flatten_ts) -> dict:
         if emitted is not None and signal is None:
             signal = emitted
 
-    base = {"signal": signal, "trade": None, "opening_range": strat.opening_range,
-            "crossover": None, "replay_valid": True}
+    context = strat.strategy_context()
+    base = {"strategy": strategy, "signal": signal, "trade": None,
+            "strategy_context": context, "crossover": None, "replay_valid": True}
 
     if signal is None:
         return base
@@ -58,10 +60,9 @@ def run_replay(rth_bars, config, *, flatten_ts) -> dict:
         entry_cents=fp["entry_slippage_cents"], exit_cents=fp["exit_slippage_cents"],
         entry_bps=fp["entry_slippage_bps"], exit_bps=fp["exit_slippage_bps"],
     )
-    orng = strat.opening_range
     canonical = simulate_pessimistic(
-        bars_after, trigger_price=signal.trigger_price, or_high=orng.high, or_low=orng.low,
-        flatten_ts=flatten_ts, r_multiple=config["orb"]["target_r_multiple"], params=params,
+        bars_after, trigger_price=signal.trigger_price, stop_price=signal.stop_price,
+        flatten_ts=flatten_ts, target_r_multiple=signal.target_r_multiple, params=params,
     )
 
     try:
@@ -80,14 +81,14 @@ def run_replay(rth_bars, config, *, flatten_ts) -> dict:
 
     fsw = config["fills"]["friction_sweep"]
     table, crossover = run_sweep(
-        bars_after, trigger_price=signal.trigger_price, or_high=orng.high, or_low=orng.low,
-        flatten_ts=flatten_ts, r_multiple=config["orb"]["target_r_multiple"],
+        bars_after, trigger_price=signal.trigger_price, stop_price=signal.stop_price,
+        flatten_ts=flatten_ts, target_r_multiple=signal.target_r_multiple,
         cents_grid=fsw["cents"], bps_grid=fsw["bps"], crossover_bps=fp["exit_slippage_bps"],
     )
 
     trade = CanonicalTrade(
-        or_high=orng.high,
-        or_low=orng.low,
+        or_high=(context or {}).get("or_high"),
+        or_low=(context or {}).get("or_low"),
         signal_bar_ts=signal.signal_bar_ts,
         fill_bar_ts=canonical["fill_bar_ts"],
         exit_signal_bar_ts=canonical["exit_bar_ts"],

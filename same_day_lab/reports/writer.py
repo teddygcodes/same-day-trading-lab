@@ -19,6 +19,12 @@ SMOKE_NOTE = "ORB is a smoke test, not a validated edge."
 STRATEGY_NAME = "orb_long_5m"
 
 
+def _strategy_note(strategy: str) -> str:
+    if strategy == STRATEGY_NAME:
+        return SMOKE_NOTE
+    return f"{strategy} is a pre-registered hypothesis, not a validated edge."
+
+
 def git_commit() -> str | None:
     try:
         out = subprocess.run(
@@ -61,6 +67,7 @@ def build_report(
     run_id,
     symbol,
     session_date,
+    strategy,
     provider,
     feed,
     config_hash,
@@ -80,7 +87,7 @@ def build_report(
 ) -> dict:
     signal = replay_result.get("signal")
     trade = replay_result.get("trade")
-    orng = replay_result.get("opening_range")
+    context = replay_result.get("strategy_context")
     crossover = replay_result.get("crossover")
 
     signal_block = (
@@ -100,11 +107,14 @@ def build_report(
     core = {
         "symbol": symbol,
         "session_date": session_date,
+        "strategy": strategy,
         "config_hash": config_hash,
         "bars": {"expected": bar_count_expected, "actual": bar_count_actual},
         "quality_summary": quality_summary,
         "data_valid": data_valid,
-        "opening_range": ({"high": _r(orng.high), "low": _r(orng.low)} if orng else None),
+        "strategy_context": (
+            {k: _r(v) for k, v in context.items()} if context else None
+        ),
         "signal": signal_block,
         "trade": _trade_block(trade),
         "friction_sweep": (trade.friction_sweep if trade is not None else None),
@@ -119,7 +129,7 @@ def build_report(
         "data_warning": DATA_WARNING,
         "run": {
             "run_id": run_id,
-            "strategy": STRATEGY_NAME,
+            "strategy": strategy,
             "started_at_utc": started_at,
             "completed_at_utc": completed_at,
         },
@@ -131,7 +141,7 @@ def build_report(
         "no_lookahead_proof": proof,
         "data_reasons": data_reasons,
         **core,
-        "note": SMOKE_NOTE,
+        "note": _strategy_note(strategy),
         "report_hash": report_hash,
     }
     return report
@@ -168,7 +178,7 @@ def _markdown(report) -> str:
     lines.append(f"# same-day-trading-lab report — {r['symbol']} {r['session_date']}")
     lines.append("")
     lines.append(f"- **Verdict:** `{r['verdict']}`")
-    lines.append(f"- Strategy: {r['run']['strategy']} (smoke test) — _{r['note']}_")
+    lines.append(f"- Strategy: `{r['run']['strategy']}` — _{r['note']}_")
     lines.append(f"- Provider/feed: {r['provider']} / {r['feed']}")
     lines.append(f"- Config hash: `{r['config_hash'][:16]}…`  Report hash: `{r['report_hash'][:16]}…`")
     lines.append(f"- Git commit: `{r['git_commit']}`")
@@ -187,8 +197,9 @@ def _markdown(report) -> str:
             lines.append(f"  - missing: {', '.join(shown)}{more}")
     lines.append("")
 
-    if r["opening_range"]:
-        lines.append(f"## Opening range\nhigh {r['opening_range']['high']} / low {r['opening_range']['low']}\n")
+    if r["strategy_context"]:
+        ctx = ", ".join(f"{k} {v}" for k, v in r["strategy_context"].items())
+        lines.append(f"## Strategy context\n{ctx}\n")
     if r["no_lookahead_proof"]:
         p = r["no_lookahead_proof"]
         lines.append("## No-lookahead proof")

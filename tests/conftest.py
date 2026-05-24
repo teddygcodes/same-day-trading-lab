@@ -17,6 +17,7 @@ def make_bar(
     c,
     *,
     v=1000.0,
+    vw=None,
     rth=True,
     symbol="AAPL",
     date="2025-05-15",
@@ -36,6 +37,7 @@ def make_bar(
         volume=v,
         provider=provider,
         is_regular_market_hours=rth,
+        vwap=vw,
     )
 
 

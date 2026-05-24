@@ -18,6 +18,7 @@ from .ingest.raw_archive import archive_raw
 from .quality.summary import evaluate
 from .replay.reconstruct import reconstruct
 from .storage import sqlite as db
+from .strategy import DEFAULT_STRATEGY, STRATEGIES
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -158,7 +159,8 @@ def _cmd_run(args) -> int:
     db.init_db(conn)
 
     result = runner.run_one_day(
-        conn, args.symbol, args.date, config, reports_dir=_reports_dir(args.db)
+        conn, args.symbol, args.date, config, reports_dir=_reports_dir(args.db),
+        strategy=args.strategy,
     )
     if result.get("missing_ingest"):
         print(
@@ -180,7 +182,8 @@ def _cmd_run_range(args) -> int:
     db.init_db(conn)
 
     agg = runner.run_range(
-        conn, args.symbol, args.start, args.end, config, reports_dir=_reports_dir(args.db)
+        conn, args.symbol, args.start, args.end, config, reports_dir=_reports_dir(args.db),
+        strategy=args.strategy,
     )
     c = agg["counts"]
     print(
@@ -238,9 +241,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_ing.add_argument("--db", default=None, help="path to the SQLite file")
     p_ing.set_defaults(func=_cmd_ingest)
 
-    p_run = sub.add_parser("run", help="replay + ORB + dual fills + report")
+    p_run = sub.add_parser("run", help="replay + strategy + dual fills + report")
     p_run.add_argument("--symbol", default="AAPL")
     p_run.add_argument("--date", default="2025-05-15")
+    p_run.add_argument(
+        "--strategy", choices=sorted(STRATEGIES), default=DEFAULT_STRATEGY,
+        help="registered strategy name (default: %(default)s)",
+    )
     p_run.add_argument("--db", default=None, help="path to the SQLite file")
     p_run.set_defaults(func=_cmd_run)
 
@@ -253,6 +260,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_range.add_argument("--symbol", default="AAPL")
     p_range.add_argument("--start", required=True, help="range start, YYYY-MM-DD (inclusive)")
     p_range.add_argument("--end", required=True, help="range end, YYYY-MM-DD (inclusive)")
+    p_range.add_argument(
+        "--strategy", choices=sorted(STRATEGIES), default=DEFAULT_STRATEGY,
+        help="registered strategy name (default: %(default)s)",
+    )
     p_range.add_argument("--db", default=None, help="path to the SQLite file")
     p_range.set_defaults(func=_cmd_run_range)
 

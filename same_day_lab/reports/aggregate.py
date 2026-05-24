@@ -26,6 +26,7 @@ def build_aggregate(
     symbol: str,
     start: str,
     end: str,
+    strategy: str,
     config_hash: str,
     per_day: list[dict],
     missing_weekdays: list[str],
@@ -82,6 +83,7 @@ def build_aggregate(
     # Deterministic core — the only thing aggregate_hash covers.
     core = {
         "symbol": symbol,
+        "strategy": strategy,
         "range": {"start": start, "end": end},
         "config_hash": config_hash,
         "days": [{"date": p["session_date"], "report_hash": p["report_hash"]} for p in days],
@@ -101,6 +103,7 @@ def build_aggregate(
         "data_warning": DATA_WARNING,
         "kind": "aggregate",
         "symbol": symbol,
+        "strategy": strategy,
         "range": {"start": start, "end": end},
         "config_hash": config_hash,
         "counts": counts,
@@ -123,6 +126,7 @@ def _aggregate_markdown(report: dict) -> str:
     lines = [r["data_warning"], ""]
     lines.append(f"# same-day-trading-lab aggregate — {r['symbol']} {r['range']['start']} → {r['range']['end']}")
     lines.append("")
+    lines.append(f"- Strategy: `{r['strategy']}`")
     lines.append(f"- Config hash: `{r['config_hash'][:16]}…`  Aggregate hash: `{r['aggregate_hash'][:16]}…`")
     lines.append(f"- _{r['note']}_")
     lines.append("")

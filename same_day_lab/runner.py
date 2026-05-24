@@ -19,8 +19,9 @@ from .quality.summary import evaluate
 from .replay import run_replay
 from .reports.aggregate import build_aggregate, write_aggregate
 from .reports.verdict import decide_verdict
-from .reports.writer import STRATEGY_NAME, build_report, write_reports
+from .reports.writer import build_report, write_reports
 from .storage import sqlite as db
+from .strategy import DEFAULT_STRATEGY
 
 
 def _now() -> str:
@@ -46,7 +47,9 @@ def weekdays_in_range(start: str, end: str) -> list[str]:
     return out
 
 
-def run_one_day(conn, symbol: str, date: str, config: dict, *, reports_dir: str) -> dict:
+def run_one_day(
+    conn, symbol: str, date: str, config: dict, *, reports_dir: str, strategy: str = DEFAULT_STRATEGY
+) -> dict:
     """Replay one fully isolated (symbol, date): fills → verdict → report → persist.
 
     Returns the per-day analytics (including ``report_hash`` and the full report).
@@ -66,7 +69,7 @@ def run_one_day(conn, symbol: str, date: str, config: dict, *, reports_dir: str)
     rth = [b for b in bars if b.is_regular_market_hours]
 
     started = _now()
-    rr = run_replay(rth, config, flatten_ts=session.flatten_ts)
+    rr = run_replay(rth, config, flatten_ts=session.flatten_ts, strategy=strategy)
     trade = rr["trade"]
 
     if trade is not None:
@@ -94,6 +97,7 @@ def run_one_day(conn, symbol: str, date: str, config: dict, *, reports_dir: str)
         run_id=run_id,
         symbol=symbol,
         session_date=session.session_date,
+        strategy=strategy,
         provider=ing["provider"],
         feed=payload.get("feed"),
         config_hash=cfg_hash,
@@ -120,8 +124,8 @@ def run_one_day(conn, symbol: str, date: str, config: dict, *, reports_dir: str)
             "ingest_run_id": ing["ingest_run_id"],
             "symbol": symbol,
             "session_date": session.session_date,
-            "strategy_name": STRATEGY_NAME,
-            "strategy_config_hash": content_hash(config["orb"]),
+            "strategy_name": strategy,
+            "strategy_config_hash": content_hash({"strategy": strategy, "orb": config.get("orb")}),
             "config_hash": cfg_hash,
             "started_at_utc": started,
             "completed_at_utc": completed,
@@ -179,7 +183,10 @@ def run_one_day(conn, symbol: str, date: str, config: dict, *, reports_dir: str)
     }
 
 
-def run_range(conn, symbol: str, start: str, end: str, config: dict, *, reports_dir: str) -> dict:
+def run_range(
+    conn, symbol: str, start: str, end: str, config: dict, *, reports_dir: str,
+    strategy: str = DEFAULT_STRATEGY,
+) -> dict:
     """Replay every ingested day in ``[start, end]`` independently and aggregate.
 
     Days are the **ingested** dates in range (deduped by ``session_date``); each is
@@ -188,7 +195,10 @@ def run_range(conn, symbol: str, start: str, end: str, config: dict, *, reports_
     """
     rows = db.get_ingest_runs_in_range(conn, symbol, start, end)
     dates = sorted({r["session_date"] for r in rows})
-    per_day = [run_one_day(conn, symbol, d, config, reports_dir=reports_dir) for d in dates]
+    per_day = [
+        run_one_day(conn, symbol, d, config, reports_dir=reports_dir, strategy=strategy)
+        for d in dates
+    ]
     ingested = set(dates)
     missing = [d for d in weekdays_in_range(start, end) if d not in ingested]
 
@@ -196,6 +206,7 @@ def run_range(conn, symbol: str, start: str, end: str, config: dict, *, reports_
         symbol=symbol,
         start=start,
         end=end,
+        strategy=strategy,
         config_hash=config_hash(config),
         per_day=per_day,
         missing_weekdays=missing,

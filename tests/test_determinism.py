@@ -18,7 +18,8 @@ def test_two_runs_produce_identical_report_hash(tmp_path):
     assert r1["report_hash"] == r2["report_hash"]
     assert len(r1["report_hash"]) == 64
     for key in (
-        "opening_range",
+        "strategy",
+        "strategy_context",
         "trade",
         "friction_sweep",
         "crossover",

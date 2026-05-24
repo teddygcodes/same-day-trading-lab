@@ -50,9 +50,19 @@ class OpeningRange:
 
 
 @dataclass(frozen=True)
-class EntrySignal:
+class TradePlan:
+    """A strategy-agnostic long entry plan emitted on the firing bar.
+
+    The fill engine prices this generically: entry on the next bar at
+    ``max(next_open, trigger) + slippage``, target geometry FIX #2 generalized to
+    ``target = entry + target_r_multiple * (entry - stop_price)``. ``stop_price`` is
+    strategy-defined and must be ``< trigger_price`` (long only).
+    """
+
     signal_bar_ts: datetime
     trigger_price: float
+    stop_price: float
+    target_r_multiple: float
 
 
 @dataclass(frozen=True)
@@ -70,10 +80,11 @@ class CanonicalTrade:
     The pessimistic simulation defines the path (entry bar, exit bar, reason);
     naive re-prices that same path at zero slippage, which structurally yields
     ``naive_pnl >= pessimistic_pnl``.
+
+    ``or_high``/``or_low`` are optional strategy context (the opening range for ORB
+    and the OR-fade); strategies with no opening range leave them ``None``.
     """
 
-    or_high: float
-    or_low: float
     signal_bar_ts: datetime
     fill_bar_ts: datetime
     exit_signal_bar_ts: datetime | None
@@ -87,4 +98,6 @@ class CanonicalTrade:
     pessimistic_pnl: float
     exit_reason: str                # "target" | "stop" | "flatten"
     friction_sweep: list
+    or_high: float | None = None    # optional strategy context (opening range)
+    or_low: float | None = None
     notes: dict = field(default_factory=dict)

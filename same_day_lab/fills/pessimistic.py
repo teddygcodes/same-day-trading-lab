@@ -29,10 +29,9 @@ def simulate_pessimistic(
     bars_after_signal,
     *,
     trigger_price: float,
-    or_high: float,
-    or_low: float,
+    stop_price: float,
     flatten_ts,
-    r_multiple: float,
+    target_r_multiple: float,
     params,
 ) -> dict:
     if not bars_after_signal:
@@ -42,8 +41,8 @@ def simulate_pessimistic(
     entry_ref = max(entry_bar.open, trigger_price)
     entry = _buy_adverse(entry_ref, params.entry_cents, params.entry_bps)
 
-    stop = or_low
-    target = entry + r_multiple * (entry - stop)
+    stop = stop_price
+    target = entry + target_r_multiple * (entry - stop)
 
     exit_price = None
     exit_reason = None

@@ -16,8 +16,8 @@ def test_pessimistic_le_naive_on_controlled_path():
     entry = _entry_bar()
     after = [entry, make_bar(utc(h=13, minute=42), 100.30, 100.70, 100.30, 100.65)]  # target hit
     canon = simulate_pessimistic(
-        after, trigger_price=100.25, or_high=100.20, or_low=100.00,
-        flatten_ts=FAR_FLATTEN, r_multiple=1.0, params=CFG_PARAMS,
+        after, trigger_price=100.25, stop_price=100.00,
+        flatten_ts=FAR_FLATTEN, target_r_multiple=1.0, params=CFG_PARAMS,
     )
     naive = price_naive(trigger_price=100.25, canonical=canon, flatten_close=after[-1].close)
     assert canon["exit_reason"] == "target"
@@ -31,8 +31,8 @@ def test_stop_wins_when_stop_and_target_share_a_bar():
     # one bar where low pierces the stop (100.00) AND high clears the target
     after = [entry, make_bar(utc(h=13, minute=42), 100.30, 100.90, 99.95, 100.10)]
     canon = simulate_pessimistic(
-        after, trigger_price=100.25, or_high=100.20, or_low=100.00,
-        flatten_ts=FAR_FLATTEN, r_multiple=1.0, params=CFG_PARAMS,
+        after, trigger_price=100.25, stop_price=100.00,
+        flatten_ts=FAR_FLATTEN, target_r_multiple=1.0, params=CFG_PARAMS,
     )
     assert canon["exit_reason"] == "stop"
 
@@ -42,8 +42,8 @@ def test_gap_through_stop_fills_worse_than_stop():
     # bar gaps open below the stop -> filled at the open, worse than the stop level
     after = [entry, make_bar(utc(h=13, minute=42), 99.90, 99.95, 99.80, 99.85)]
     canon = simulate_pessimistic(
-        after, trigger_price=100.25, or_high=100.20, or_low=100.00,
-        flatten_ts=FAR_FLATTEN, r_multiple=1.0, params=CFG_PARAMS,
+        after, trigger_price=100.25, stop_price=100.00,
+        flatten_ts=FAR_FLATTEN, target_r_multiple=1.0, params=CFG_PARAMS,
     )
     assert canon["exit_reason"] == "stop"
     assert canon["pessimistic_exit"] < 100.00  # worse than the OR-low stop level
@@ -57,8 +57,8 @@ def test_target_requires_move_beyond_not_touch():
     beyond = make_bar(utc(h=13, minute=43), 100.90, 101.01, 100.80, 101.00)  # high > target
     after = [entry, touch, beyond]
     canon = simulate_pessimistic(
-        after, trigger_price=100.00, or_high=100.00, or_low=99.00,
-        flatten_ts=FAR_FLATTEN, r_multiple=1.0, params=p0,
+        after, trigger_price=100.00, stop_price=99.00,
+        flatten_ts=FAR_FLATTEN, target_r_multiple=1.0, params=p0,
     )
     assert canon["target"] == 101.00
     assert canon["exit_reason"] == "target"
@@ -71,8 +71,8 @@ def test_flatten_when_neither_stop_nor_target():
     flat_bar = make_bar(FAR_FLATTEN, 100.30, 100.35, 100.25, 100.30)
     after = [entry, make_bar(utc(h=13, minute=42), 100.30, 100.40, 100.25, 100.32), flat_bar]
     canon = simulate_pessimistic(
-        after, trigger_price=100.25, or_high=100.20, or_low=100.00,
-        flatten_ts=FAR_FLATTEN, r_multiple=1.0, params=CFG_PARAMS,
+        after, trigger_price=100.25, stop_price=100.00,
+        flatten_ts=FAR_FLATTEN, target_r_multiple=1.0, params=CFG_PARAMS,
     )
     assert canon["exit_reason"] == "flatten"
     assert canon["exit_bar_ts"] == flat_bar.bar_start_ts
@@ -82,8 +82,8 @@ def test_sweep_table_and_crossover_shapes():
     entry = _entry_bar()
     after = [entry, make_bar(utc(h=13, minute=42), 100.30, 100.70, 100.30, 100.65)]
     table, crossover = run_sweep(
-        after, trigger_price=100.25, or_high=100.20, or_low=100.00,
-        flatten_ts=FAR_FLATTEN, r_multiple=1.0,
+        after, trigger_price=100.25, stop_price=100.00,
+        flatten_ts=FAR_FLATTEN, target_r_multiple=1.0,
         cents_grid=[0, 1, 2, 5, 10], bps_grid=[0, 5, 10, 15], crossover_bps=5,
     )
     assert len(table) == 5 * 4

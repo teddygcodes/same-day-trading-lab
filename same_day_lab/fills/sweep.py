@@ -17,10 +17,9 @@ def run_sweep(
     bars_after_signal,
     *,
     trigger_price: float,
-    or_high: float,
-    or_low: float,
+    stop_price: float,
     flatten_ts,
-    r_multiple: float,
+    target_r_multiple: float,
     cents_grid,
     bps_grid,
     crossover_bps: int,
@@ -31,10 +30,9 @@ def run_sweep(
             res = simulate_pessimistic(
                 bars_after_signal,
                 trigger_price=trigger_price,
-                or_high=or_high,
-                or_low=or_low,
+                stop_price=stop_price,
                 flatten_ts=flatten_ts,
-                r_multiple=r_multiple,
+                target_r_multiple=target_r_multiple,
                 params=FillParams(entry_cents=c, exit_cents=c, entry_bps=b, exit_bps=b),
             )
             table.append(
