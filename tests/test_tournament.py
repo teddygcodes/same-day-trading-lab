@@ -227,3 +227,20 @@ def test_cli_end_to_end(tmp_path):
     ) == 0
     files = sorted((tmp_path / "reports").glob("*_tournament.json"))
     assert len(files) == 1
+
+
+def test_tournament_writes_only_tournament_files(tmp_path):
+    """The tournament (3 strategies × 2 windows) leaves only the tournament JSON+MD —
+    no incidental per-day report files and no per-strategy sub-aggregate files."""
+    conn = db.connect(_setup(tmp_path))
+    rd = tmp_path / "reports"
+    runner.run_tournament(
+        conn, "AAPL", decide_start=DECIDE[0], decide_end=DECIDE[1],
+        holdout_start=HOLDOUT[0], holdout_end=HOLDOUT[1], config=load_config(),
+        reports_dir=str(rd),
+    )
+    files = sorted(p.name for p in rd.iterdir())
+    assert all(name.endswith("_tournament.json") or name.endswith("_tournament.md") for name in files), files
+    assert len(files) == 2
+    assert list(rd.glob("*run_*")) == []        # no per-day report files
+    assert list(rd.glob("*_aggregate.*")) == []  # no per-strategy sub-aggregate files

@@ -49,13 +49,21 @@ def weekdays_in_range(start: str, end: str) -> list[str]:
 
 
 def run_one_day(
-    conn, symbol: str, date: str, config: dict, *, reports_dir: str, strategy: str = DEFAULT_STRATEGY
+    conn, symbol: str, date: str, config: dict, *, reports_dir: str,
+    strategy: str = DEFAULT_STRATEGY, write_report_file: bool = True,
 ) -> dict:
     """Replay one fully isolated (symbol, date): fills → verdict → report → persist.
 
     Returns the per-day analytics (including ``report_hash`` and the full report).
     A date with no ingest returns ``{"missing_ingest": True, ...}`` (the caller
     decides how to surface it) — never fabricates or substitutes data.
+
+    ``write_report_file`` controls only whether the per-day JSON+MD *file* is written:
+    the single-day ``run`` command leaves it ``True``; rollups (``run_range`` /
+    ``run_tournament``) pass ``False`` to avoid littering ``reports/`` with incidental
+    per-day files. The report dict is built and the per-day ``runs``/``trades`` DB rows
+    are persisted either way — when no file is written the row's report paths are empty
+    (no dangling path), not a path to a nonexistent file.
     """
     cfg_hash = config_hash(config)
     ing = db.get_ingest_run(conn, symbol, date)
@@ -116,7 +124,10 @@ def run_one_day(
         started_at=started,
         completed_at=completed,
     )
-    json_path, md_path = write_reports(report, reports_dir)
+    if write_report_file:
+        json_path, md_path = write_reports(report, reports_dir)
+    else:
+        json_path = md_path = ""  # no file → empty path in the runs row, never a dangling one
 
     db.insert_run(
         conn,
@@ -192,15 +203,19 @@ def aggregate_range(
     aggregate **in memory** (no sub-aggregate file written).
 
     Days are the **ingested** dates in range (deduped by ``session_date``); each is
-    replayed via ``run_one_day`` (which writes its own per-day report files + DB rows).
-    Weekdays in range with no ingest are reported as missing — never invented. The
-    returned dict has no ``aggregate_*_path`` keys; callers that want files on disk
-    use ``run_range``.
+    replayed via ``run_one_day`` with ``write_report_file=False`` — it persists per-day
+    ``runs``/``trades`` DB rows but writes no incidental per-day report files (the
+    aggregate is the deliverable). Weekdays in range with no ingest are reported as
+    missing — never invented. The returned dict has no ``aggregate_*_path`` keys; callers
+    that want files on disk use ``run_range``.
     """
     rows = db.get_ingest_runs_in_range(conn, symbol, start, end)
     dates = sorted({r["session_date"] for r in rows})
     per_day = [
-        run_one_day(conn, symbol, d, config, reports_dir=reports_dir, strategy=strategy)
+        run_one_day(
+            conn, symbol, d, config, reports_dir=reports_dir, strategy=strategy,
+            write_report_file=False,
+        )
         for d in dates
     ]
     ingested = set(dates)

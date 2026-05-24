@@ -159,3 +159,56 @@ def test_run_range_cli_end_to_end(tmp_path):
     ) == 0
     aggs = sorted((tmp_path / "reports").glob("*_aggregate.json"))
     assert len(aggs) == 1
+
+
+def test_run_one_day_no_file_write_preserves_hash_and_nulls_paths(tmp_path):
+    """Rollup mode (write_report_file=False) suppresses the per-day file but keeps the
+    report_hash identical and the per-day DB row intact with empty path columns."""
+    conn = db.connect(_setup_range_db(tmp_path))
+    cfg = load_config()
+    rd = str(tmp_path / "reports")
+
+    written = runner.run_one_day(conn, "AAPL", "2025-07-07", cfg, reports_dir=rd)
+    suppressed = runner.run_one_day(
+        conn, "AAPL", "2025-07-07", cfg, reports_dir=rd, write_report_file=False
+    )
+
+    # analytical content (and thus the hash) is unchanged by suppressing the file
+    assert suppressed["report_hash"] == written["report_hash"]
+    # no dangling path: the returned paths are empty, not a file that doesn't exist
+    assert suppressed["report_json_path"] == ""
+    assert suppressed["report_md_path"] == ""
+
+    # the per-day runs row is still persisted, with empty path columns
+    row = conn.execute(
+        "SELECT report_json_path, report_md_path FROM runs WHERE session_date = ? "
+        "ORDER BY started_at_utc DESC LIMIT 1",
+        ("2025-07-07",),
+    ).fetchone()
+    assert row["report_json_path"] == ""
+    assert row["report_md_path"] == ""
+
+
+def test_run_range_writes_only_aggregate_files(tmp_path):
+    """run-range leaves the reports dir with just the aggregate JSON+MD — no incidental
+    per-day report files."""
+    conn = db.connect(_setup_range_db(tmp_path))
+    rd = tmp_path / "reports"
+    runner.run_range(conn, "AAPL", "2025-07-07", "2025-07-11", load_config(), reports_dir=str(rd))
+
+    files = sorted(p.name for p in rd.iterdir())
+    assert files == [
+        "AAPL_2025-07-07_2025-07-11_aggregate.json",
+        "AAPL_2025-07-07_2025-07-11_aggregate.md",
+    ]
+    # no per-day report files (their stems carry the per-run id "run_...")
+    assert list(rd.glob("*run_*")) == []
+
+
+def test_single_day_run_still_writes_per_day_files(tmp_path):
+    """Regression: the single-day `run` command keeps writing its per-day JSON+MD."""
+    db_path = _setup_range_db(tmp_path)
+    assert cli.main(["run", "--symbol", "AAPL", "--date", "2025-07-07", "--db", db_path]) == 0
+    rd = tmp_path / "reports"
+    assert len(list(rd.glob("AAPL_2025-07-07_run_*.json"))) == 1
+    assert len(list(rd.glob("AAPL_2025-07-07_run_*.md"))) == 1
