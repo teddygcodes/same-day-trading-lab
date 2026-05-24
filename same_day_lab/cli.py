@@ -1,7 +1,7 @@
 """Command-line entry point.
 
-Subcommands: init-db, ingest, run, reconstruct, report. This module only parses
-arguments and dispatches to the pipeline modules.
+Subcommands: init-db, ingest, run, run-range, tournament, reconstruct, report. This
+module only parses arguments and dispatches to the pipeline modules.
 """
 
 import argparse
@@ -200,6 +200,38 @@ def _cmd_run_range(args) -> int:
     return 0
 
 
+def _cmd_tournament(args) -> int:
+    config = load_config()
+    conn = db.connect(args.db)
+    db.init_db(conn)
+
+    t = runner.run_tournament(
+        conn, args.symbol, decide_start=args.decide_start, decide_end=args.decide_end,
+        holdout_start=args.holdout_start, holdout_end=args.holdout_end, config=config,
+        reports_dir=_reports_dir(args.db),
+    )
+    print(
+        f"tournament {args.symbol}: {t['n_strategies']} strategies evaluated over "
+        f"decide {args.decide_start}→{args.decide_end} and holdout "
+        f"{args.holdout_start}→{args.holdout_end}"
+    )
+    print(f"  CAVEAT: {t['multiple_comparisons_caveat']}")
+    for row in t["leaderboard"]:
+        print(
+            f"  {row['strategy']}: decide survives={row['decide']['survives']}, "
+            f"holdout survives={row['holdout']['survives']} → carried_forward="
+            f"{row['carried_forward']}"
+        )
+    for label, key in (("decide", "decide_window"), ("holdout", "holdout_window")):
+        miss = t[key]["missing_weekdays"]
+        if miss:
+            print(f"  missing weekdays ({label}, no ingest): {', '.join(miss)}")
+    print(f"  tournament json: {t['tournament_json_path']}")
+    print(f"  tournament md:   {t['tournament_md_path']}")
+    print(f"  tournament_hash: {t['tournament_hash'][:16]}...")
+    return 0
+
+
 def _cmd_reconstruct(args) -> int:
     config = load_config()
     conn = db.connect(args.db)
@@ -266,6 +298,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_range.add_argument("--db", default=None, help="path to the SQLite file")
     p_range.set_defaults(func=_cmd_run_range)
+
+    p_tourn = sub.add_parser(
+        "tournament",
+        help="evaluate the full registered strategy set over a decide + holdout window",
+        description="Descriptive cross-strategy × cross-window leaderboard. Evaluates the "
+        "WHOLE registered set (no subset flag — choosing after peeking is the bias this "
+        "guards against). 'Carried forward' = survives both windows; this is a flag, not a "
+        "verdict. No tournament winner / validation verdict.",
+    )
+    p_tourn.add_argument("--symbol", default="AAPL")
+    p_tourn.add_argument("--decide-start", required=True, help="decide window start, YYYY-MM-DD")
+    p_tourn.add_argument("--decide-end", required=True, help="decide window end, YYYY-MM-DD")
+    p_tourn.add_argument("--holdout-start", required=True, help="holdout window start, YYYY-MM-DD")
+    p_tourn.add_argument("--holdout-end", required=True, help="holdout window end, YYYY-MM-DD")
+    p_tourn.add_argument("--db", default=None, help="path to the SQLite file")
+    p_tourn.set_defaults(func=_cmd_tournament)
 
     p_rec = sub.add_parser(
         "reconstruct",

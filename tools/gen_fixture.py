@@ -302,6 +302,89 @@ def gen_invalid() -> dict:
             "feed": "fixture", "is_half_day": False, "bars": bars}
 
 
+# ---- v0.4b two-window tournament mix ----------------------------------------
+# A decide window (2025-08-04 Mon .. 08-08 Fri; ingest 08-04, 08-05) and a holdout
+# window (2025-08-11 Mon .. 08-15 Fri; ingest 08-11, 08-12), engineered so the three
+# registered strategies show a spread under the tournament's "survives a window" rule:
+#   orb_long_5m       — survives decide (an orb-survive day), but a holdout KILL day
+#                       drops it: the holdout gate visibly bites (carried_forward False).
+#   or_fade_long      — survives BOTH windows (an or-fade-survive day in each):
+#                       carried_forward True.
+#   vwap_reclaim_long — never triggers on any of these days: no-signal everywhere.
+# The remaining weekdays in each window are left ungenerated → per-window missing-weekday
+# surfacing. Days reuse the shared _OR_LULL (OR high 100.20, OR low 100.00); they diverge
+# only after the OR so the strategy differences are isolated.
+
+# OR-fade survive shape: a breakdown below the OR low, a reclaim back above it (the
+# or_fade long signal), then a single high spike that exceeds the target — while every
+# CLOSE stays below the OR high (so orb never triggers) and below the rising cumulative
+# VWAP (so vwap never reclaims). Only or_fade trades; it hits its target.
+_ORFADE = {
+    **_OR_LULL,
+    10: (100.10, 100.12, 99.40, 99.99),    # breakdown: close 99.99 < OR low; deep low 99.40 = swing low (wide stop)
+    11: (99.99, 100.06, 99.95, 100.05),    # reclaim: close 100.05 > OR low -> or_fade signal (still below cum VWAP)
+    12: (100.00, 100.10, 99.95, 100.02),   # entry bar (exits only scan strictly after this)
+    13: (100.02, 101.20, 100.00, 100.05),  # target spike: high 101.20 >> target; close stays low (orb & vwap silent)
+}
+
+
+def _gen_orb_survive_day(date_str: str) -> dict:
+    base = _open_utc(date_str)
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _SURVIVE:
+            o, h, l, c = _SURVIVE[i]
+        else:  # flat tail well above the stop; the trade already exited at the target
+            mid = 101.90 + (i % 5) * 0.01
+            o, h, l, c = mid, mid + 0.05, mid - 0.05, mid + 0.02
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    assert min(b["l"] for b in bars[11:]) > 100.00, "stop must never be touched; no OR-low breakdown"
+    return {"symbol": "AAPL", "session_date": date_str, "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
+def _gen_orb_kill_day(date_str: str) -> dict:
+    base = _open_utc(date_str)
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _KILL:
+            o, h, l, c = _KILL[i]
+        elif i == 389:  # flatten bar: close above the breakout -> naive shows a win
+            o, h, l, c = (100.31, 100.35, 100.27, 100.30)
+        else:  # range-bound below the target, above the stop and OR low: hits neither
+            mid = 100.30 + (i % 5) * 0.02
+            o, h, l, c = mid, mid + 0.04, mid - 0.05, mid
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    post = bars[12:]
+    assert max(b["h"] for b in post) < 100.64, "target must stay out of reach at default friction"
+    assert min(b["l"] for b in bars[10:]) > 100.00, "no OR-low breakdown -> or_fade stays silent"
+    assert bars[389]["c"] == 100.30
+    return {"symbol": "AAPL", "session_date": date_str, "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
+def _gen_or_fade_survive_day(date_str: str) -> dict:
+    base = _open_utc(date_str)
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _ORFADE:
+            o, h, l, c = _ORFADE[i]
+        else:  # flat low tail: closes below the OR high AND below cum VWAP -> orb & vwap silent
+            mid = 100.00
+            o, h, l, c = mid, mid + 0.04, mid - 0.04, mid
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    assert max(b["c"] for b in bars) <= 100.20, "no close above the OR high -> orb never triggers"
+    assert min(b["l"] for b in bars) == 99.40, "swing low for the or_fade stop"
+    return {"symbol": "AAPL", "session_date": date_str, "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
 def _assert_valid(bars, *, expected):
     assert len(bars) == expected, (len(bars), expected)
     for b in bars:
@@ -328,9 +411,19 @@ def main():
     ):
         with open(os.path.join(OUT, fn), "w") as f:
             json.dump(gen(), f, indent=2)
+    # v0.4b two-window tournament mix
+    for fn, gen, date_str in (
+        ("orb_survive_0804_aapl_1m.json", _gen_orb_survive_day, "2025-08-04"),
+        ("or_fade_survive_0805_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-05"),
+        ("orb_kill_0811_aapl_1m.json", _gen_orb_kill_day, "2025-08-11"),
+        ("or_fade_survive_0812_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-12"),
+    ):
+        with open(os.path.join(OUT, fn), "w") as f:
+            json.dump(gen(date_str), f, indent=2)
     print("wrote fixtures/sample_aapl_1m_day.json and fixtures/half_day_aapl_1m.json")
     print("wrote fixtures/messy_real_aapl_1m.json")
     print("wrote fixtures/{survive,kill,nosignal,invalid}_aapl_1m.json")
+    print("wrote fixtures/{orb_survive_0804,or_fade_survive_0805,orb_kill_0811,or_fade_survive_0812}_aapl_1m.json")
 
 
 if __name__ == "__main__":

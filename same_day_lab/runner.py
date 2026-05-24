@@ -18,10 +18,11 @@ from .ingest.normalize import build_session, normalize_bars
 from .quality.summary import evaluate
 from .replay import run_replay
 from .reports.aggregate import build_aggregate, write_aggregate
+from .reports.tournament import build_tournament, write_tournament
 from .reports.verdict import decide_verdict
 from .reports.writer import build_report, write_reports
 from .storage import sqlite as db
-from .strategy import DEFAULT_STRATEGY
+from .strategy import DEFAULT_STRATEGY, STRATEGIES
 
 
 def _now() -> str:
@@ -183,15 +184,18 @@ def run_one_day(
     }
 
 
-def run_range(
+def aggregate_range(
     conn, symbol: str, start: str, end: str, config: dict, *, reports_dir: str,
     strategy: str = DEFAULT_STRATEGY,
 ) -> dict:
-    """Replay every ingested day in ``[start, end]`` independently and aggregate.
+    """Replay every ingested day in ``[start, end]`` independently and build the
+    aggregate **in memory** (no sub-aggregate file written).
 
     Days are the **ingested** dates in range (deduped by ``session_date``); each is
-    replayed via ``run_one_day`` (writing its own per-day report files + DB rows).
-    Weekdays in range with no ingest are reported as missing — never invented.
+    replayed via ``run_one_day`` (which writes its own per-day report files + DB rows).
+    Weekdays in range with no ingest are reported as missing — never invented. The
+    returned dict has no ``aggregate_*_path`` keys; callers that want files on disk
+    use ``run_range``.
     """
     rows = db.get_ingest_runs_in_range(conn, symbol, start, end)
     dates = sorted({r["session_date"] for r in rows})
@@ -202,7 +206,7 @@ def run_range(
     ingested = set(dates)
     missing = [d for d in weekdays_in_range(start, end) if d not in ingested]
 
-    aggregate = build_aggregate(
+    return build_aggregate(
         symbol=symbol,
         start=start,
         end=end,
@@ -211,7 +215,63 @@ def run_range(
         per_day=per_day,
         missing_weekdays=missing,
     )
+
+
+def run_range(
+    conn, symbol: str, start: str, end: str, config: dict, *, reports_dir: str,
+    strategy: str = DEFAULT_STRATEGY,
+) -> dict:
+    """Replay every ingested day in ``[start, end]`` independently and aggregate,
+    writing the aggregate JSON + Markdown to ``reports_dir``."""
+    aggregate = aggregate_range(
+        conn, symbol, start, end, config, reports_dir=reports_dir, strategy=strategy
+    )
     json_path, md_path = write_aggregate(aggregate, reports_dir)
     aggregate["aggregate_json_path"] = json_path
     aggregate["aggregate_md_path"] = md_path
     return aggregate
+
+
+def run_tournament(
+    conn, symbol: str, *, decide_start: str, decide_end: str, holdout_start: str,
+    holdout_end: str, config: dict, reports_dir: str,
+) -> dict:
+    """Evaluate the **entire** registered strategy set over a decide window and a
+    holdout window, and emit a descriptive leaderboard with a corroboration flag.
+
+    For each registered strategy × each window the per-strategy aggregate is computed
+    **in memory** via ``aggregate_range`` (no sub-aggregate files written); the
+    tournament is a thin cross-strategy × cross-window rollup that forks no fill/verdict
+    logic. Evaluating the whole set — never a peeked subset — is the anti-selection-bias
+    point, so there is no strategy-subset argument.
+    """
+    strategies = sorted(STRATEGIES)
+    decide_window = {"start": decide_start, "end": decide_end}
+    holdout_window = {"start": holdout_start, "end": holdout_end}
+
+    results = {
+        s: {
+            "decide": aggregate_range(
+                conn, symbol, decide_start, decide_end, config,
+                reports_dir=reports_dir, strategy=s,
+            ),
+            "holdout": aggregate_range(
+                conn, symbol, holdout_start, holdout_end, config,
+                reports_dir=reports_dir, strategy=s,
+            ),
+        }
+        for s in strategies
+    }
+
+    tournament = build_tournament(
+        symbol=symbol,
+        config_hash=config_hash(config),
+        decide_window=decide_window,
+        holdout_window=holdout_window,
+        strategies=strategies,
+        results=results,
+    )
+    json_path, md_path = write_tournament(tournament, reports_dir)
+    tournament["tournament_json_path"] = json_path
+    tournament["tournament_md_path"] = md_path
+    return tournament

@@ -29,6 +29,13 @@ _FIXTURE_FILES = {
     ("AAPL", "2025-07-08"): "kill_aapl_1m.json",
     ("AAPL", "2025-07-09"): "nosignal_aapl_1m.json",
     ("AAPL", "2025-07-10"): "invalid_aapl_1m.json",
+    # v0.4b two-window tournament mix. Decide window 2025-08-04..08-08 (ingest 08-04,
+    # 08-05); holdout window 2025-08-11..08-15 (ingest 08-11, 08-12). Other weekdays
+    # left open → per-window missing-weekday surfacing.
+    ("AAPL", "2025-08-04"): "orb_survive_0804_aapl_1m.json",
+    ("AAPL", "2025-08-05"): "or_fade_survive_0805_aapl_1m.json",
+    ("AAPL", "2025-08-11"): "orb_kill_0811_aapl_1m.json",
+    ("AAPL", "2025-08-12"): "or_fade_survive_0812_aapl_1m.json",
 }
 
 
