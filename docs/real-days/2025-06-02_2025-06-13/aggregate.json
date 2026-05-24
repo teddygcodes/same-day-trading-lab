@@ -1,0 +1,152 @@
+{
+  "data_warning": "DATA WARNING:\nThis run may use Alpaca free/IEX feed bars. IEX represents only a subset of US\nequity market volume. Reported volume is not consolidated-tape volume. Bar\nhighs/lows may exclude prints from other venues. No quote/spread data is present.\nSpreads and fills are modeled, not observed. Do not interpret any P&L as achievable.",
+  "kind": "aggregate",
+  "symbol": "AAPL",
+  "range": {
+    "start": "2025-06-02",
+    "end": "2025-06-13"
+  },
+  "config_hash": "80f1718a8e2907e28ea94484581419fad23a35cabc664d9723bcd23847d3b370",
+  "counts": {
+    "days_ingested": 10,
+    "invalid_data": 0,
+    "invalid_replay": 0,
+    "no_signal": 3,
+    "traded": 7,
+    "traded_naive_gt0": 1,
+    "traded_pessimistic_default_gt0": 1,
+    "traded_survived_pass_threshold": 1,
+    "traded_killed_by_friction": 0
+  },
+  "crossover_cents_distribution": {
+    "none": 1,
+    "0": 6
+  },
+  "fill_honesty_headline": 0,
+  "per_day": [
+    {
+      "date": "2025-06-02",
+      "report_hash": "ed9fa0b3d0f6bcffb7fcbcb01499e13179dff590317675da153a49db29e46e4f",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": false,
+      "exit_reason": null,
+      "naive_pnl": null,
+      "pessimistic_default_pnl": null,
+      "pessimistic_pass_pnl": null,
+      "crossover_cents": null
+    },
+    {
+      "date": "2025-06-03",
+      "report_hash": "391207d93562cc8e02dd3fc763146bd9db9f0b4c5674e64898d6d2f8cd678164",
+      "data_valid": true,
+      "verdict": "PASS_FOR_MORE_TESTING",
+      "traded": true,
+      "exit_reason": "flatten",
+      "naive_pnl": 0.7250000000000227,
+      "pessimistic_default_pnl": 0.47702999999998497,
+      "pessimistic_pass_pnl": 0.41703,
+      "crossover_cents": null
+    },
+    {
+      "date": "2025-06-04",
+      "report_hash": "e2eac7b7a21ba63fe5747a6e9f386d2789da264eb9e143f9c22ad246206cdf52",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": true,
+      "exit_reason": "stop",
+      "naive_pnl": -1.6450000000000102,
+      "pessimistic_default_pnl": -1.9435450000000287,
+      "pessimistic_pass_pnl": -2.003545,
+      "crossover_cents": 0
+    },
+    {
+      "date": "2025-06-05",
+      "report_hash": "81193b4d8b7a50db4848d440f4c10b0722114a00f1bb784dc546a14ef50cf94f",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": true,
+      "exit_reason": "stop",
+      "naive_pnl": -1.009999999999991,
+      "pessimistic_default_pnl": -1.2581874999999911,
+      "pessimistic_pass_pnl": -1.318187,
+      "crossover_cents": 0
+    },
+    {
+      "date": "2025-06-06",
+      "report_hash": "3b7db8afd30ac0a9378656e33f3f51a254f44b0a7bbdddbaf6764e9a7c521aee",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": false,
+      "exit_reason": null,
+      "naive_pnl": null,
+      "pessimistic_default_pnl": null,
+      "pessimistic_pass_pnl": null,
+      "crossover_cents": null
+    },
+    {
+      "date": "2025-06-09",
+      "report_hash": "38330e22efb2babc0ee0d1c4b96e67c016e0ccdf68f549f2f074ce11664a38e5",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": true,
+      "exit_reason": "stop",
+      "naive_pnl": -1.1899999999999977,
+      "pessimistic_default_pnl": -1.4346050000000048,
+      "pessimistic_pass_pnl": -1.494605,
+      "crossover_cents": 0
+    },
+    {
+      "date": "2025-06-10",
+      "report_hash": "cb07e1ba644e3030bca1fb3592ba7acc89881aa0ba799a10578416fa5a0270a2",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": true,
+      "exit_reason": "flatten",
+      "naive_pnl": -0.5,
+      "pessimistic_default_pnl": -0.7429300000000012,
+      "pessimistic_pass_pnl": -0.80293,
+      "crossover_cents": 0
+    },
+    {
+      "date": "2025-06-11",
+      "report_hash": "4c19cc0d1dbd118ab006028f97e4566b99fbc71871857df6deb58c4eb33b410a",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": true,
+      "exit_reason": "stop",
+      "naive_pnl": -1.2300000000000182,
+      "pessimistic_default_pnl": -1.4734950000000424,
+      "pessimistic_pass_pnl": -1.533495,
+      "crossover_cents": 0
+    },
+    {
+      "date": "2025-06-12",
+      "report_hash": "1dd940c966c663362ca0f81276688a652c4eef12a062d8eae375f2526d799b27",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": true,
+      "exit_reason": "flatten",
+      "naive_pnl": -0.2849999999999966,
+      "pessimistic_default_pnl": -0.5242375000000266,
+      "pessimistic_pass_pnl": -0.584238,
+      "crossover_cents": 0
+    },
+    {
+      "date": "2025-06-13",
+      "report_hash": "8e7a12cccb1c5753c1d763ce96781ce11f145c16fca7954eeee0af2e30e3d9f3",
+      "data_valid": true,
+      "verdict": "HOLD_MORE_DATA",
+      "traded": false,
+      "exit_reason": null,
+      "naive_pnl": null,
+      "pessimistic_default_pnl": null,
+      "pessimistic_pass_pnl": null,
+      "crossover_cents": null
+    }
+  ],
+  "missing_weekdays": [],
+  "disposition": "7 of 10 ingested day(s) traded; naive looked profitable on 1, pessimistic + friction killed 0; 1 survived the pass threshold; 0 INVALID_DATA, 3 no-signal. No aggregate verdict.",
+  "note": "Descriptive distribution only \u2014 no aggregate validation verdict. Per-day verdicts stand as-is; naive fills can never validate a strategy.",
+  "aggregate_hash": "b9dbad97debc84f1708ef2ea8ffb7f8498341c37befb2ddc6e9089c9959ed0a0"
+}
