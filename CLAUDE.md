@@ -104,8 +104,9 @@ never fabricates (no market-calendar dependency).
 ## Dev workflow
 
 - **Python 3.11+. Stdlib-minimal**: argparse, dataclasses, sqlite3, zoneinfo, urllib.
-  External deps are only `pyyaml`, `tzdata`, and `pytest` — do not add others without
-  a build prompt that says so.
+  External deps are `pyyaml` + `tzdata` (core) and `pytest` (test extra); `certifi` is an
+  optional `alpaca` extra (`pip install -e ".[alpaca]"`) that makes live pulls verify TLS
+  without a manual `SSL_CERT_FILE`. Do not add others without a build prompt that says so.
 - **TDD**: write a failing test → minimal implementation → green → commit. Small,
   frequent commits.
 - **Tests must run offline.** No network in the suite. Fixtures (`fixtures/*.json`,

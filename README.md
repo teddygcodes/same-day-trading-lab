@@ -62,6 +62,7 @@ Set creds, then either ingest directly or — recommended — **record a real da
 offline fixture** so the run is reproducible and the suite stays offline:
 
 ```bash
+pip install -e ".[alpaca]"   # installs certifi so live pulls verify TLS (no SSL_CERT_FILE needed)
 cp .env.example .env         # then set ALPACA_API_KEY / ALPACA_SECRET_KEY
 export ALPACA_API_KEY=...  ALPACA_SECRET_KEY=...
 
