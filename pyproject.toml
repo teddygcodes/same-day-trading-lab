@@ -11,6 +11,7 @@ dependencies = ["pyyaml>=6", "tzdata>=2024.1"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+alpaca = ["certifi"]
 
 [project.scripts]
 same-day-lab = "same_day_lab.cli:main"

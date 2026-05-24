@@ -8,6 +8,7 @@ to clear, graceful messages (no tracebacks) via ``AlpacaError``.
 
 import json
 import os
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -17,6 +18,24 @@ from datetime import timedelta
 from .normalize import session_bounds
 
 BASE_URL = "https://data.alpaca.markets/v2/stocks"
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """Default-verified TLS context, backed by certifi's CA bundle when available.
+
+    The python.org macOS build ships no CA bundle, so the stdlib default fails to
+    verify Alpaca's cert unless SSL_CERT_FILE is set manually. We layer certifi's
+    bundle on top of a *verified* default context when certifi is importable (the
+    optional ``[alpaca]`` extra), and fall back to system defaults otherwise.
+    Verification stays on either way.
+    """
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except Exception:
+        pass  # fall back to system defaults
+    return ctx
 
 
 class AlpacaCredentialsMissing(RuntimeError):
@@ -49,7 +68,7 @@ def _retry_after_seconds(err, default=1.0) -> float:
 def _get_json(url: str, headers: dict, *, _retried: bool = False) -> dict:
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (trusted host)
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as resp:  # noqa: S310 (trusted host)
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
