@@ -11,8 +11,11 @@ The whole point is to measure how much apparent P&L dies moving from fantasy (na
 fills to pessimistic fills, on **1-minute bars, without lookahead**. ORB is only a
 smoke-test subject, not a strategy we believe in.
 
-It is **NOT** a trading bot, backtester-for-profit, optimizer, or dashboard. Paper
-P&L is never trusted (a retired predecessor, "Bob", taught that lesson).
+It is **NOT** a trading bot, backtester-for-profit, or dashboard. As of **v0.5** it also
+supports *controlled combinatorial discovery* — but only under the empirical-null +
+three-window gauntlet discipline (see **Combinatorial discovery (v0.5)**); it is still not
+a free optimizer or curve-fitter, and paper P&L is never trusted (a retired predecessor,
+"Bob", taught that lesson).
 
 ## Working model (roles)
 
@@ -26,11 +29,12 @@ P&L is never trusted (a retired predecessor, "Bob", taught that lesson).
 
 Live/real-capital orders · broker execution · order routing · async / threading /
 websockets · live forward data collection · dashboards / Streamlit / Gradio / any UI ·
-dynamic or top-volume symbol universes · optimizers / grid search · a multi-strategy
-*engine* · portfolio allocation · shorting / leverage / margin · overnight holds ·
-tick/quote dependency · an LLM anywhere in the decision path · a generalized provider
-framework · rich HTML reports. Do not add Sharpe/Sortino/annualized/equity-curve
-metrics or marketing language to reports.
+dynamic or top-volume symbol universes · portfolio allocation · shorting / leverage /
+margin · overnight holds · tick/quote dependency · an LLM anywhere in the decision path ·
+a generalized provider framework · rich HTML reports. Do not add Sharpe/Sortino/
+annualized/equity-curve metrics or marketing language to reports. **Combinatorial
+enumeration and survivor selection are permitted only under the Combinatorial-discovery
+discipline below; free optimization or per-candidate parameter tuning remains forbidden.**
 
 ## NEVER violate (load-bearing invariants)
 
@@ -124,6 +128,35 @@ report states how many strategies were tried (**multiple-comparisons caveat**) a
 It is a thin rollup over `run_range`; it never optimizes, searches, or cherry-picks a
 subset. Evaluate the whole registered set — choosing a subset after peeking is the bias
 this guards against.
+
+## Combinatorial discovery (v0.5)
+
+The lab may **enumerate** a strategy space and **select** survivors — but only as a
+disciplined, null-anchored experiment, never as free search:
+
+- **Frozen, versioned, pre-registered vocabulary.** Candidates are the full Cartesian
+  product of orthogonal pieces (entry trigger × context filters × exit × stop), committed
+  to a file with a `vocabulary_version`. **No quality-based pruning** of "nonsensical"
+  combinations (that is a hidden optimizer — let the null judge). **Editing the vocabulary
+  after seeing any results invalidates pre-registration** — bump the version, never edit in
+  place.
+- **Empirical null is mandatory.** Primary null = **random-entry** (random eligible bar each
+  day, same exit/stop geometry, committed seed) run across the full universe → `E_FP` (noise
+  survivor count). Date-block shuffle may be reported as a **caveated secondary** only (it is
+  ~degenerate for per-day-independent intraday strategies). Report **Signal-to-Noise = real
+  survivors / E_FP**; **S/N ≤ 1 means a noise-magnification machine with no edge.** No
+  analytical/Bonferroni correction (invalid for correlated candidates).
+- **Three-window gauntlet:** chronological, non-overlapping `DISCOVER → CORROBORATE →
+  HOLDOUT`. The null is a DISCOVER-phase instrument; CORROBORATE/HOLDOUT are untouched by it
+  and looked at once. `carried_forward` = survives all three, using the **existing**
+  friction-survival criterion everywhere. Baselines (no-trade, buy-open/sell-close,
+  random-entry) reported alongside; "survived" is meaningless without them.
+- **No winner/validation verdict.** State the multiple-comparisons reality via the S/N
+  ratio, not a p-value. Survivors on IEX data are **presumed microstructure artifacts**
+  until re-run on consolidated tape; say so in the report header.
+- Still single-threaded, no LLM, no live, no per-candidate tuning; the symbol basket is a
+  **static committed** list processed sequentially (never dynamic/top-volume). Every
+  structural invariant above applies identically to every generated candidate.
 
 ## Dev workflow
 
