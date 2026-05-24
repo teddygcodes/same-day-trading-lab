@@ -302,18 +302,22 @@ def gen_invalid() -> dict:
             "feed": "fixture", "is_half_day": False, "bars": bars}
 
 
-# ---- v0.4b two-window tournament mix ----------------------------------------
-# A decide window (2025-08-04 Mon .. 08-08 Fri; ingest 08-04, 08-05) and a holdout
-# window (2025-08-11 Mon .. 08-15 Fri; ingest 08-11, 08-12), engineered so the three
-# registered strategies show a spread under the tournament's "survives a window" rule:
-#   orb_long_5m       — survives decide (an orb-survive day), but a holdout KILL day
-#                       drops it: the holdout gate visibly bites (carried_forward False).
-#   or_fade_long      — survives BOTH windows (an or-fade-survive day in each):
-#                       carried_forward True.
-#   vwap_reclaim_long — never triggers on any of these days: no-signal everywhere.
-# The remaining weekdays in each window are left ungenerated → per-window missing-weekday
-# surfacing. Days reuse the shared _OR_LULL (OR high 100.20, OR low 100.00); they diverge
-# only after the OR so the strategy differences are isolated.
+# ---- v0.4b two-window tournament mix (v0.4b.1 fraction gate) -----------------
+# A decide window (2025-08-04 Mon .. 08-13 Wed; ingest the first six weekdays) and a
+# holdout window (2025-08-18 Mon .. 08-27 Wed; ingest the first six weekdays), engineered
+# so the three registered strategies span the tournament's fraction-gate "survives a
+# window" rule (>=3 traded, a strict >50% PASS majority, 0 KILL):
+#   or_fade_long      — 3/3 PASS in BOTH windows -> survives both -> carried_forward True.
+#   orb_long_5m       — 3/3 PASS in decide (survives), but only 1/3 PASS (0 KILL) in the
+#                       holdout -> dropped by the fraction gate (carried_forward False).
+#                       This is the regression case: >=1 holdout PASS yet NOT carried —
+#                       exactly what the old ">=1 PASS" rule got wrong.
+#   vwap_reclaim_long — never PASSes any of these days -> never a majority (False both).
+# Each day triggers exactly one strategy (single-strategy isolation): the decide window
+# has three orb-survive + three or-fade-survive days; the holdout has three or-fade-survive
+# + one orb-survive + two orb-holdmore days. Remaining weekdays per window are left
+# ungenerated → per-window missing-weekday surfacing. Days reuse the shared _OR_LULL (OR
+# high 100.20, OR low 100.00); they diverge only after the OR so differences are isolated.
 
 # OR-fade survive shape: a breakdown below the OR low, a reclaim back above it (the
 # or_fade long signal), then a single high spike that exceeds the target — while every
@@ -385,6 +389,32 @@ def _gen_or_fade_survive_day(date_str: str) -> dict:
             "feed": "fixture", "is_half_day": False, "bars": bars}
 
 
+def _gen_orb_holdmore_day(date_str: str) -> dict:
+    """orb breaks out (close 100.25 > OR high) but the day drifts sideways below the
+    breakout and flattens UNDER the trigger close, so naive itself loses -> HOLD_MORE_DATA
+    (not a KILL: a KILL needs naive>0). The target is never reached and the OR low is never
+    breached (so or_fade stays silent). One of these per non-PASS orb holdout day."""
+    base = _open_utc(date_str)
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _KILL:                       # _OR_LULL + breakout (close 100.25) + entry bar
+            o, h, l, c = _KILL[i]
+        elif i == 389:                       # flatten bar: close BELOW the breakout -> naive < 0
+            o, h, l, c = (100.17, 100.20, 100.10, 100.15)
+        else:  # range-bound below the breakout/target, above the stop and OR low: hits neither
+            mid = 100.15 + (i % 5) * 0.01
+            o, h, l, c = mid, mid + 0.04, mid - 0.05, mid
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    post = bars[12:]
+    assert max(b["h"] for b in post) < 100.64, "target must stay out of reach at default friction"
+    assert min(b["l"] for b in bars[10:]) > 100.00, "no OR-low breakdown -> or_fade stays silent"
+    assert bars[389]["c"] < 100.25, "flatten close below the breakout -> naive loses -> HOLD not KILL"
+    return {"symbol": "AAPL", "session_date": date_str, "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
 def _assert_valid(bars, *, expected):
     assert len(bars) == expected, (len(bars), expected)
     for b in bars:
@@ -411,19 +441,29 @@ def main():
     ):
         with open(os.path.join(OUT, fn), "w") as f:
             json.dump(gen(), f, indent=2)
-    # v0.4b two-window tournament mix
+    # v0.4b two-window tournament mix (v0.4b.1 fraction gate)
     for fn, gen, date_str in (
+        # decide window 2025-08-04..08-13 (ingest the first six weekdays; 08-12/08-13 open)
         ("orb_survive_0804_aapl_1m.json", _gen_orb_survive_day, "2025-08-04"),
-        ("or_fade_survive_0805_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-05"),
-        ("orb_kill_0811_aapl_1m.json", _gen_orb_kill_day, "2025-08-11"),
-        ("or_fade_survive_0812_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-12"),
+        ("orb_survive_0805_aapl_1m.json", _gen_orb_survive_day, "2025-08-05"),
+        ("orb_survive_0806_aapl_1m.json", _gen_orb_survive_day, "2025-08-06"),
+        ("or_fade_survive_0807_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-07"),
+        ("or_fade_survive_0808_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-08"),
+        ("or_fade_survive_0811_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-11"),
+        # holdout window 2025-08-18..08-27 (ingest the first six weekdays; 08-26/08-27 open)
+        ("or_fade_survive_0818_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-18"),
+        ("or_fade_survive_0819_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-19"),
+        ("or_fade_survive_0820_aapl_1m.json", _gen_or_fade_survive_day, "2025-08-20"),
+        ("orb_survive_0821_aapl_1m.json", _gen_orb_survive_day, "2025-08-21"),
+        ("orb_holdmore_0822_aapl_1m.json", _gen_orb_holdmore_day, "2025-08-22"),
+        ("orb_holdmore_0825_aapl_1m.json", _gen_orb_holdmore_day, "2025-08-25"),
     ):
         with open(os.path.join(OUT, fn), "w") as f:
             json.dump(gen(date_str), f, indent=2)
     print("wrote fixtures/sample_aapl_1m_day.json and fixtures/half_day_aapl_1m.json")
     print("wrote fixtures/messy_real_aapl_1m.json")
     print("wrote fixtures/{survive,kill,nosignal,invalid}_aapl_1m.json")
-    print("wrote fixtures/{orb_survive_0804,or_fade_survive_0805,orb_kill_0811,or_fade_survive_0812}_aapl_1m.json")
+    print("wrote v0.4b.1 tournament mix: 6 decide + 6 holdout single-strategy fixtures")
 
 
 if __name__ == "__main__":

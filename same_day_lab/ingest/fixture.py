@@ -29,13 +29,22 @@ _FIXTURE_FILES = {
     ("AAPL", "2025-07-08"): "kill_aapl_1m.json",
     ("AAPL", "2025-07-09"): "nosignal_aapl_1m.json",
     ("AAPL", "2025-07-10"): "invalid_aapl_1m.json",
-    # v0.4b two-window tournament mix. Decide window 2025-08-04..08-08 (ingest 08-04,
-    # 08-05); holdout window 2025-08-11..08-15 (ingest 08-11, 08-12). Other weekdays
-    # left open → per-window missing-weekday surfacing.
+    # v0.4b two-window tournament mix (v0.4b.1 fraction gate). Decide window
+    # 2025-08-04..08-13 (ingest the first six weekdays; 08-12/08-13 left open); holdout
+    # window 2025-08-18..08-27 (ingest the first six weekdays; 08-26/08-27 left open) →
+    # per-window missing-weekday surfacing. Single-strategy days (see tools/gen_fixture.py).
     ("AAPL", "2025-08-04"): "orb_survive_0804_aapl_1m.json",
-    ("AAPL", "2025-08-05"): "or_fade_survive_0805_aapl_1m.json",
-    ("AAPL", "2025-08-11"): "orb_kill_0811_aapl_1m.json",
-    ("AAPL", "2025-08-12"): "or_fade_survive_0812_aapl_1m.json",
+    ("AAPL", "2025-08-05"): "orb_survive_0805_aapl_1m.json",
+    ("AAPL", "2025-08-06"): "orb_survive_0806_aapl_1m.json",
+    ("AAPL", "2025-08-07"): "or_fade_survive_0807_aapl_1m.json",
+    ("AAPL", "2025-08-08"): "or_fade_survive_0808_aapl_1m.json",
+    ("AAPL", "2025-08-11"): "or_fade_survive_0811_aapl_1m.json",
+    ("AAPL", "2025-08-18"): "or_fade_survive_0818_aapl_1m.json",
+    ("AAPL", "2025-08-19"): "or_fade_survive_0819_aapl_1m.json",
+    ("AAPL", "2025-08-20"): "or_fade_survive_0820_aapl_1m.json",
+    ("AAPL", "2025-08-21"): "orb_survive_0821_aapl_1m.json",
+    ("AAPL", "2025-08-22"): "orb_holdmore_0822_aapl_1m.json",
+    ("AAPL", "2025-08-25"): "orb_holdmore_0825_aapl_1m.json",
 }
 
 

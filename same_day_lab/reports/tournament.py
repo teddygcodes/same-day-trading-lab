@@ -24,12 +24,19 @@ import os
 from .. import DATA_WARNING
 from ..hashing import content_hash
 
-# A-priori, counts-only definition — deliberately simple and NOT tuned to the data.
+# A-priori, counts-only honesty constants — pre-registered, fixed before looking, and
+# deliberately NOT tuned to flip any strategy on the real data. A single in-sample PASS is
+# weak evidence; the gate demands a strict majority of traded days over a minimum sample.
+MIN_TRADED_DAYS = 3          # too few trades in a window -> can't corroborate
+SURVIVE_PASS_FRACTION = 0.50  # a strict majority (>50%) of traded days must survive friction
+
 SURVIVES_RULE = (
-    "A strategy survives a window iff, in that window, at least one day is "
-    "PASS_FOR_MORE_TESTING (cleared the friction-survival gate) AND no day is a "
-    "fill-honesty KILL_STRATEGY. carried_forward = survives the decide window AND the "
-    "holdout window."
+    f"A strategy survives a window iff, in that window, it traded at least "
+    f"{MIN_TRADED_DAYS} days, a strict majority (>{int(SURVIVE_PASS_FRACTION * 100)}%) of "
+    "those traded days are PASS_FOR_MORE_TESTING (cleared the friction-survival gate), and "
+    "no day is a fill-honesty KILL_STRATEGY. The day floor and pass-fraction are "
+    "pre-registered, a-priori honesty constants — fixed before looking and never tuned to "
+    "the data. carried_forward = survives the decide window AND the holdout window."
 )
 
 NO_VERDICT_NOTE = (
@@ -40,7 +47,12 @@ NO_VERDICT_NOTE = (
 
 
 def _survives(counts: dict) -> bool:
-    return counts["traded_survived_pass_threshold"] >= 1 and counts["traded_killed_by_friction"] == 0
+    traded = counts["traded"]
+    if traded < MIN_TRADED_DAYS:
+        return False
+    if counts["traded_killed_by_friction"] > 0:
+        return False
+    return counts["traded_survived_pass_threshold"] / traded > SURVIVE_PASS_FRACTION
 
 
 def _window_summary(aggregate: dict) -> dict:
