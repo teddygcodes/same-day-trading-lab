@@ -1,0 +1,55 @@
+{
+  "data_warning": "DATA WARNING:\nThis run may use Alpaca free/IEX feed bars. IEX represents only a subset of US\nequity market volume. Reported volume is not consolidated-tape volume. Bar\nhighs/lows may exclude prints from other venues. No quote/spread data is present.\nSpreads and fills are modeled, not observed. Do not interpret any P&L as achievable.",
+  "run": {
+    "run_id": "run_AAPL_2025-06-13_ae074986",
+    "strategy": "orb_long_5m",
+    "started_at_utc": "2026-05-24T00:30:27.858689+00:00",
+    "completed_at_utc": "2026-05-24T00:30:27.861358+00:00"
+  },
+  "provider": "fixture",
+  "feed": "iex",
+  "git_commit": "013bdaa0d68b2c03c95e2ffc0dc01cedde6c68c3",
+  "ingest_run_id": "fixture_AAPL_2025-06-13",
+  "raw_hash": "89d2c93390e31ee0b6b77efbe80eca0475716f530ead130b7a31b6bc03695490",
+  "no_lookahead_proof": null,
+  "data_reasons": [],
+  "symbol": "AAPL",
+  "session_date": "2025-06-13",
+  "config_hash": "80f1718a8e2907e28ea94484581419fad23a35cabc664d9723bcd23847d3b370",
+  "bars": {
+    "expected": 390,
+    "actual": 389
+  },
+  "quality_summary": {
+    "bar_count": 389,
+    "rth_bar_count": 389,
+    "bar_count_expected": 390,
+    "missing_bar_count": 1,
+    "missing_bars": [
+      "2025-06-13T16:23:00+00:00"
+    ],
+    "halt_suspected": false,
+    "halt_runs": [],
+    "duplicate_bars": [],
+    "stale_repeat_runs": [],
+    "partial_session": false,
+    "suspicious_ohlc_count": 0,
+    "zero_volume_count": 0,
+    "extreme_move_count": 0,
+    "out_of_session_count": 0
+  },
+  "data_valid": true,
+  "opening_range": {
+    "high": 200.3,
+    "low": 198.64
+  },
+  "signal": null,
+  "trade": null,
+  "friction_sweep": null,
+  "crossover": null,
+  "pessimistic_default_pnl": null,
+  "pessimistic_pass_pnl": null,
+  "verdict": "HOLD_MORE_DATA",
+  "note": "ORB is a smoke test, not a validated edge.",
+  "report_hash": "8e7a12cccb1c5753c1d763ce96781ce11f145c16fca7954eeee0af2e30e3d9f3"
+}
