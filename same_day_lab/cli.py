@@ -8,21 +8,15 @@ import argparse
 import json
 import os
 import sys
-import uuid
 from datetime import datetime, timezone
 
-from . import DATA_WARNING
+from . import DATA_WARNING, runner
 from .config import config_hash, load_config
-from .fills.sweep import pnl_at
-from .hashing import content_hash
 from .ingest import alpaca, fixture
 from .ingest.normalize import build_session, normalize_bars
 from .ingest.raw_archive import archive_raw
 from .quality.summary import evaluate
-from .replay import run_replay
 from .replay.reconstruct import reconstruct
-from .reports.verdict import decide_verdict
-from .reports.writer import STRATEGY_NAME, build_report, write_reports
 from .storage import sqlite as db
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -160,122 +154,46 @@ def _cmd_ingest(args) -> int:
 
 def _cmd_run(args) -> int:
     config = load_config()
-    cfg_hash = config_hash(config)
     conn = db.connect(args.db)
     db.init_db(conn)
 
-    ing = db.get_ingest_run(conn, args.symbol, args.date)
-    if ing is None:
+    result = runner.run_one_day(
+        conn, args.symbol, args.date, config, reports_dir=_reports_dir(args.db)
+    )
+    if result.get("missing_ingest"):
         print(
             f"run failed: no ingest for {args.symbol} {args.date}; run `ingest` first",
             file=sys.stderr,
         )
         return 1
 
-    with open(ing["raw_path"]) as f:
-        payload = json.load(f)["raw_payload"]
-    bars = normalize_bars(payload, config, provider=ing["provider"])
-    session = build_session(payload, bars, config)
-    _per_bar, summary, data_valid, reasons = evaluate(bars, session, config)
-    rth = [b for b in bars if b.is_regular_market_hours]
+    print(f"verdict: {result['verdict']}")
+    print(f"  report json: {result['report_json_path']}")
+    print(f"  report md:   {result['report_md_path']}")
+    print(f"  report_hash: {result['report_hash'][:16]}...")
+    return 0
 
-    started = _now()
-    rr = run_replay(rth, config, flatten_ts=session.flatten_ts)
-    trade = rr["trade"]
 
-    if trade is not None:
-        pess_default = trade.pessimistic_pnl
-        ex_bps = config["fills"]["pessimistic"]["exit_slippage_bps"]
-        pass_cents = config["verdict"]["min_friction_cents_to_pass"]
-        pess_pass = pnl_at(trade.friction_sweep, cents=pass_cents, bps=ex_bps)
-        naive_pnl = trade.naive_pnl
-    else:
-        pess_default = pess_pass = naive_pnl = None
+def _cmd_run_range(args) -> int:
+    config = load_config()
+    conn = db.connect(args.db)
+    db.init_db(conn)
 
-    verdict = decide_verdict(
-        replay_valid=rr["replay_valid"],
-        data_valid=data_valid,
-        signal_present=trade is not None,
-        naive_pnl=naive_pnl,
-        pessimistic_default_pnl=pess_default,
-        pessimistic_pass_pnl=pess_pass,
-        config=config,
+    agg = runner.run_range(
+        conn, args.symbol, args.start, args.end, config, reports_dir=_reports_dir(args.db)
     )
-
-    run_id = f"run_{args.symbol}_{session.session_date}_{uuid.uuid4().hex[:8]}"
-    completed = _now()
-    report = build_report(
-        run_id=run_id,
-        symbol=args.symbol,
-        session_date=session.session_date,
-        provider=ing["provider"],
-        feed=payload.get("feed"),
-        config_hash=cfg_hash,
-        ingest_run_id=ing["ingest_run_id"],
-        raw_hash=ing["raw_hash"],
-        quality_summary=summary,
-        bar_count_expected=session.bar_count_expected,
-        bar_count_actual=session.bar_count_actual,
-        replay_result=rr,
-        data_valid=data_valid,
-        data_reasons=reasons,
-        verdict=verdict,
-        pessimistic_default_pnl=pess_default,
-        pessimistic_pass_pnl=pess_pass,
-        started_at=started,
-        completed_at=completed,
+    c = agg["counts"]
+    print(
+        f"aggregate {args.symbol} {args.start}→{args.end}: "
+        f"{c['days_ingested']} day(s) ingested, {c['traded']} traded, "
+        f"KILL {c['traded_killed_by_friction']}, survived-pass {c['traded_survived_pass_threshold']}"
     )
-    json_path, md_path = write_reports(report, _reports_dir(args.db))
-
-    db.insert_run(
-        conn,
-        {
-            "run_id": run_id,
-            "ingest_run_id": ing["ingest_run_id"],
-            "symbol": args.symbol,
-            "session_date": session.session_date,
-            "strategy_name": STRATEGY_NAME,
-            "strategy_config_hash": content_hash(config["orb"]),
-            "config_hash": cfg_hash,
-            "started_at_utc": started,
-            "completed_at_utc": completed,
-            "report_json_path": json_path,
-            "report_md_path": md_path,
-            "report_hash": report["report_hash"],
-            "verdict": verdict,
-        },
-    )
-    if trade is not None:
-        db.insert_trade(
-            conn,
-            {
-                "trade_id": f"{run_id}_t1",
-                "run_id": run_id,
-                "symbol": args.symbol,
-                "session_date": session.session_date,
-                "signal_bar_ts_utc": trade.signal_bar_ts.isoformat(),
-                "fill_bar_ts_utc": trade.fill_bar_ts.isoformat(),
-                "exit_signal_bar_ts_utc": trade.exit_signal_bar_ts.isoformat(),
-                "exit_fill_bar_ts_utc": trade.exit_fill_bar_ts.isoformat(),
-                "opening_range_high": trade.or_high,
-                "opening_range_low": trade.or_low,
-                "trigger_price": trade.trigger_price,
-                "naive_entry_price": trade.naive_entry_price,
-                "naive_exit_price": trade.naive_exit_price,
-                "naive_pnl": trade.naive_pnl,
-                "pessimistic_entry_price": trade.pessimistic_entry_price,
-                "pessimistic_exit_price": trade.pessimistic_exit_price,
-                "pessimistic_pnl": trade.pessimistic_pnl,
-                "friction_sweep_json": json.dumps(trade.friction_sweep),
-                "exit_reason": trade.exit_reason,
-                "notes_json": json.dumps(trade.notes),
-            },
-        )
-
-    print(f"verdict: {verdict}")
-    print(f"  report json: {json_path}")
-    print(f"  report md:   {md_path}")
-    print(f"  report_hash: {report['report_hash'][:16]}...")
+    if agg["missing_weekdays"]:
+        print(f"  missing weekdays (no ingest): {', '.join(agg['missing_weekdays'])}")
+    print(f"  fill-honesty headline: {agg['fill_honesty_headline']} day(s) naive>0 but pessimistic killed")
+    print(f"  aggregate json: {agg['aggregate_json_path']}")
+    print(f"  aggregate md:   {agg['aggregate_md_path']}")
+    print(f"  aggregate_hash: {agg['aggregate_hash'][:16]}...")
     return 0
 
 
@@ -325,6 +243,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--date", default="2025-05-15")
     p_run.add_argument("--db", default=None, help="path to the SQLite file")
     p_run.set_defaults(func=_cmd_run)
+
+    p_range = sub.add_parser(
+        "run-range",
+        help="replay each ingested day in a range independently + aggregate distribution",
+        description="Per-day independent (own clock/OR/one-trade; no carry-over, no "
+        "compounding). Descriptive counts only — no aggregate verdict.",
+    )
+    p_range.add_argument("--symbol", default="AAPL")
+    p_range.add_argument("--start", required=True, help="range start, YYYY-MM-DD (inclusive)")
+    p_range.add_argument("--end", required=True, help="range end, YYYY-MM-DD (inclusive)")
+    p_range.add_argument("--db", default=None, help="path to the SQLite file")
+    p_range.set_defaults(func=_cmd_run_range)
 
     p_rec = sub.add_parser(
         "reconstruct",

@@ -73,6 +73,19 @@ def get_ingest_run(conn, symbol: str, date: str):
     ).fetchone()
 
 
+def get_ingest_runs_in_range(conn, symbol: str, start: str, end: str):
+    """Ingested rows for ``symbol`` with ``start <= session_date <= end``.
+
+    ``session_date`` is stored as ISO ``YYYY-MM-DD`` TEXT, so a lexicographic
+    ``BETWEEN`` is also a chronological one.
+    """
+    return conn.execute(
+        "SELECT * FROM ingest_runs WHERE symbol = ? AND session_date BETWEEN ? AND ? "
+        "ORDER BY session_date",
+        (symbol, start, end),
+    ).fetchall()
+
+
 def get_bars(conn, ingest_run_id: str):
     return conn.execute(
         "SELECT * FROM bars WHERE ingest_run_id = ? ORDER BY bar_start_ts_utc", (ingest_run_id,)
@@ -103,6 +116,7 @@ __all__ = [
     "insert_run",
     "insert_trade",
     "get_ingest_run",
+    "get_ingest_runs_in_range",
     "get_bars",
     "get_session",
     "latest_run",

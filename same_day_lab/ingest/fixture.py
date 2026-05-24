@@ -24,6 +24,11 @@ _FIXTURE_FILES = {
     ("AAPL", "2025-05-15"): "sample_aapl_1m_day.json",
     ("AAPL", "2025-11-28"): "half_day_aapl_1m.json",
     ("AAPL", "2025-06-16"): "messy_real_aapl_1m.json",
+    # v0.3 multi-day synthetic mix (2025-07-07 Mon .. 07-10 Thu); 07-11 left open.
+    ("AAPL", "2025-07-07"): "survive_aapl_1m.json",
+    ("AAPL", "2025-07-08"): "kill_aapl_1m.json",
+    ("AAPL", "2025-07-09"): "nosignal_aapl_1m.json",
+    ("AAPL", "2025-07-10"): "invalid_aapl_1m.json",
 }
 
 

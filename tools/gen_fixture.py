@@ -183,6 +183,125 @@ def gen_messy() -> dict:
     }
 
 
+# ---- v0.3 multi-day synthetic mix (2025-07-07 Mon .. 07-10 Thu) -------------
+# Same OR (high 100.20, low 100.00) and pre-breakout lull as the sample; the four
+# days diverge only after the breakout so the verdict differences are isolated to
+# the post-entry path. 07-11 (Fri) is deliberately left ungenerated → the
+# missing-weekday case for run-range.
+
+_OR_LULL = {
+    0: (100.05, 100.15, 100.00, 100.10),
+    1: (100.10, 100.20, 100.05, 100.15),
+    2: (100.15, 100.18, 100.08, 100.12),
+    3: (100.12, 100.19, 100.05, 100.14),
+    4: (100.14, 100.20, 100.02, 100.16),  # OR high 100.20, OR low 100.00
+    5: (100.16, 100.20, 100.12, 100.18),  # lull: closes never exceed the OR high
+    6: (100.18, 100.20, 100.14, 100.19),
+    7: (100.19, 100.20, 100.13, 100.17),
+    8: (100.17, 100.20, 100.12, 100.18),
+    9: (100.18, 100.20, 100.15, 100.19),
+}
+
+# Survive-friction day: a large breakout that runs to ~102, so the target is hit at
+# every sweep point (with r=1 and stop=OR-low, cents-slippage nearly cancels), the
+# pass-threshold P&L stays positive -> PASS_FOR_MORE_TESTING.
+_SURVIVE = {
+    **_OR_LULL,
+    10: (100.19, 100.30, 100.18, 100.25),  # breakout close 100.25 > 100.20
+    11: (100.30, 100.45, 100.28, 100.42),  # entry bar (open 100.30)
+    12: (100.42, 100.55, 100.40, 100.52),
+    13: (100.52, 100.70, 100.50, 100.68),
+    14: (100.68, 101.05, 100.66, 101.02),  # clears the 5c target -> target hit
+    15: (101.02, 101.45, 101.00, 101.42),
+    16: (101.42, 101.85, 101.40, 101.82),
+    17: (101.82, 102.05, 101.80, 102.00),  # peak ~102
+}
+
+# KILL day: a fizzled breakout. The day ends slightly above the breakout close, so
+# naive (zero-slippage, entry at the trigger close) shows a small win — but the
+# pessimistic entry sits above it after slippage and the target is never reached, so
+# the trade flattens underwater -> naive>0 while pessimistic_default<=0 = KILL.
+_KILL = {
+    **_OR_LULL,
+    10: (100.19, 100.28, 100.18, 100.25),  # breakout close 100.25
+    11: (100.22, 100.32, 100.20, 100.28),  # entry bar (open 100.22 -> entry_ref stays 100.25)
+}
+
+
+def gen_survive() -> dict:
+    base = _open_utc("2025-07-07")
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _SURVIVE:
+            o, h, l, c = _SURVIVE[i]
+        else:  # flat tail well above the stop; the trade already exited at the target
+            mid = 101.90 + (i % 5) * 0.01
+            o, h, l, c = mid, mid + 0.05, mid - 0.05, mid + 0.02
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    assert min(b["l"] for b in bars[11:]) > 100.00, "stop must never be touched"
+    return {"symbol": "AAPL", "session_date": "2025-07-07", "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
+def gen_kill() -> dict:
+    base = _open_utc("2025-07-08")
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _KILL:
+            o, h, l, c = _KILL[i]
+        elif i == 389:  # flatten bar (15:59): close above the breakout -> naive wins
+            o, h, l, c = (100.31, 100.35, 100.27, 100.30)
+        else:  # range-bound below the target, above the stop: hits neither
+            mid = 100.30 + (i % 5) * 0.02
+            o, h, l, c = mid, mid + 0.04, mid - 0.05, mid
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    post = bars[12:]  # strictly after the entry bar
+    assert max(b["h"] for b in post) < 100.64, "target must stay out of reach at default friction"
+    assert min(b["l"] for b in post) > 100.00, "stop must never be touched"
+    assert bars[389]["c"] == 100.30, "flatten close above the breakout so naive shows a win"
+    return {"symbol": "AAPL", "session_date": "2025-07-08", "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
+def gen_no_signal() -> dict:
+    base = _open_utc("2025-07-09")
+    bars = []
+    for i in range(390):
+        t = base + timedelta(minutes=i)
+        if i in _OR_LULL:
+            o, h, l, c = _OR_LULL[i]
+        else:  # range-bound below the OR high forever -> no breakout close, no trade
+            mid = 100.08 + (i % 7) * 0.01
+            o, h, l, c = mid, mid + 0.04, mid - 0.04, mid + 0.02
+        bars.append(_bar(t, o, h, l, c))
+    _assert_valid(bars, expected=390)
+    assert max(b["c"] for b in bars) <= 100.20, "no close may exceed the OR high"
+    return {"symbol": "AAPL", "session_date": "2025-07-09", "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
+def gen_invalid() -> dict:
+    """A leading 40-minute gap reaching the session-open edge: the feed never
+    covered the full session -> partial session -> INVALID_DATA. Flat, no breakout,
+    so no trade is conflated with the invalid-data verdict."""
+    base = _open_utc("2025-07-10")
+    bars = []
+    for i in range(40, 390):  # omit the first 40 RTH minutes (no fabrication; gap stays a gap)
+        t = base + timedelta(minutes=i)
+        mid = 100.05 + (i % 3) * 0.01
+        o, h, l, c = mid, mid + 0.03, mid - 0.03, mid + 0.01
+        bars.append(_bar(t, o, h, l, c))
+    for b in bars:
+        assert b["l"] <= b["o"] <= b["h"] and b["l"] <= b["c"] <= b["h"] and b["v"] > 0, b
+    assert len(bars) == 350, len(bars)  # intentionally < 390; the missing run is the point
+    return {"symbol": "AAPL", "session_date": "2025-07-10", "timeframe": "1Min",
+            "feed": "fixture", "is_half_day": False, "bars": bars}
+
+
 def _assert_valid(bars, *, expected):
     assert len(bars) == expected, (len(bars), expected)
     for b in bars:
@@ -200,8 +319,18 @@ def main():
         json.dump(gen_half_day(), f, indent=2)
     with open(os.path.join(OUT, "messy_real_aapl_1m.json"), "w") as f:
         json.dump(gen_messy(), f, indent=2)
+    # v0.3 multi-day mix
+    for fn, gen in (
+        ("survive_aapl_1m.json", gen_survive),
+        ("kill_aapl_1m.json", gen_kill),
+        ("nosignal_aapl_1m.json", gen_no_signal),
+        ("invalid_aapl_1m.json", gen_invalid),
+    ):
+        with open(os.path.join(OUT, fn), "w") as f:
+            json.dump(gen(), f, indent=2)
     print("wrote fixtures/sample_aapl_1m_day.json and fixtures/half_day_aapl_1m.json")
     print("wrote fixtures/messy_real_aapl_1m.json")
+    print("wrote fixtures/{survive,kill,nosignal,invalid}_aapl_1m.json")
 
 
 if __name__ == "__main__":
