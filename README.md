@@ -201,6 +201,26 @@ math** (no equity curve, drawdown, or Sharpe). Weekdays in the range with no ing
 listed as *missing* (record them, or they were holidays — there is no market calendar).
 `aggregate_hash` makes the rollup deterministic.
 
+## Tournament (honest multi-strategy evaluation)
+
+```bash
+same-day-lab tournament --symbol AAPL \
+  --decide-start 2025-06-02 --decide-end 2025-06-13 \
+  --holdout-start 2025-06-17 --holdout-end 2025-06-27
+```
+
+Evaluates the **whole pre-registered strategy set** over a decide window and an unseen
+**holdout** window — the anti-overfitting layer. A strategy is `carried_forward` only if it
+**survives both windows**, where *survives* = ≥3 traded days, a **strict >50% majority** of
+traded days clear the friction threshold, and zero fill-honesty KILLs (counts-only — no
+cumulative P&L). The report carries a prominent **multiple-comparisons caveat** (it states
+how many strategies were tried) and emits **no winner/validation verdict** — corroboration
+on the holdout is *suggestive, not proof*. No parameter search, no strategy cherry-picking.
+
+On the first real sample (AAPL, decide `2025-06-02..06-13` vs holdout `06-17..06-27`),
+**0 of 3 strategies carried forward** — the in-sample PASS fractions deflated out-of-sample
+(e.g. `or_fade` 0.57 → 0.29). No corroborated edge; the holdout doing its job.
+
 ## Why v0.1 is intentionally tiny
 
 One symbol, one day, one strategy, two fill models, one report. The point is to nail

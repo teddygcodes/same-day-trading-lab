@@ -1,0 +1,91 @@
+{
+  "data_warning": "DATA WARNING:\nThis run may use Alpaca free/IEX feed bars. IEX represents only a subset of US\nequity market volume. Reported volume is not consolidated-tape volume. Bar\nhighs/lows may exclude prints from other venues. No quote/spread data is present.\nSpreads and fills are modeled, not observed. Do not interpret any P&L as achievable.",
+  "kind": "tournament",
+  "symbol": "AAPL",
+  "config_hash": "80f1718a8e2907e28ea94484581419fad23a35cabc664d9723bcd23847d3b370",
+  "strategies_evaluated": [
+    "or_fade_long",
+    "orb_long_5m",
+    "vwap_reclaim_long"
+  ],
+  "n_strategies": 3,
+  "decide_window": {
+    "start": "2025-06-02",
+    "end": "2025-06-13",
+    "missing_weekdays": []
+  },
+  "holdout_window": {
+    "start": "2025-06-17",
+    "end": "2025-06-27",
+    "missing_weekdays": [
+      "2025-06-19"
+    ]
+  },
+  "survives_rule": "A strategy survives a window iff, in that window, it traded at least 3 days, a strict majority (>50%) of those traded days are PASS_FOR_MORE_TESTING (cleared the friction-survival gate), and no day is a fill-honesty KILL_STRATEGY. The day floor and pass-fraction are pre-registered, a-priori honesty constants \u2014 fixed before looking and never tuned to the data. carried_forward = survives the decide window AND the holdout window.",
+  "leaderboard": [
+    {
+      "strategy": "or_fade_long",
+      "decide": {
+        "days_traded": 7,
+        "survived_pass": 4,
+        "killed": 0,
+        "fill_honesty": 0,
+        "aggregate_hash": "c0625cdb8d101eecb7fee5cfcf174078c916cba80f50b4e301dc40535ecdc996",
+        "survives": true
+      },
+      "holdout": {
+        "days_traded": 7,
+        "survived_pass": 2,
+        "killed": 0,
+        "fill_honesty": 0,
+        "aggregate_hash": "66b2b6c03899ba02f14c5a5b1ea20e34b2d162fa95cc4d016c62adf0bfc88c21",
+        "survives": false
+      },
+      "carried_forward": false
+    },
+    {
+      "strategy": "orb_long_5m",
+      "decide": {
+        "days_traded": 7,
+        "survived_pass": 1,
+        "killed": 0,
+        "fill_honesty": 0,
+        "aggregate_hash": "c4c8f24831cf68d82c9ff696d21f0c41e86c6061e2b9eb840e9938e35b47b055",
+        "survives": false
+      },
+      "holdout": {
+        "days_traded": 6,
+        "survived_pass": 1,
+        "killed": 0,
+        "fill_honesty": 0,
+        "aggregate_hash": "c1cd67b051459b344b46d513cf47d133e2236e139e3a3869ae34e156f5b2156d",
+        "survives": false
+      },
+      "carried_forward": false
+    },
+    {
+      "strategy": "vwap_reclaim_long",
+      "decide": {
+        "days_traded": 10,
+        "survived_pass": 5,
+        "killed": 0,
+        "fill_honesty": 0,
+        "aggregate_hash": "4ac7827ac945a0f9a9e231ee46c5ac9a3c9425cddf42a2cf8711db157207c1e8",
+        "survives": false
+      },
+      "holdout": {
+        "days_traded": 8,
+        "survived_pass": 3,
+        "killed": 0,
+        "fill_honesty": 0,
+        "aggregate_hash": "b1ee02bf47745247870f969baa9cfbc79f48b0888d259ed9f031739a985fc249",
+        "survives": false
+      },
+      "carried_forward": false
+    }
+  ],
+  "multiple_comparisons_caveat": "3 strategies evaluated; with 3 tries a single in-sample PASS is weak \u2014 corroboration on the holdout is required, and even that is suggestive, not proof.",
+  "disposition": "0 of 3 strategies carried forward (survived both windows). Descriptive only \u2014 not a verdict.",
+  "note": "Descriptive leaderboard only \u2014 no tournament winner or validation verdict. Per-strategy, per-day verdicts stand; corroboration on the holdout is suggestive, not proof.",
+  "tournament_hash": "df2addaeaf336af27ce682ceb93b1afdc6d8228fdf036e41cd4ff73edf8e256b"
+}

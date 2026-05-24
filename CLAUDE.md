@@ -75,9 +75,9 @@ naive re-pricing) → `fills/sweep` → `reports/writer` (JSON+MD) → `reports/
 
 Key modules: `replay/clock.py` + `replay/view.py` (firewall), `replay/__init__.py`
 (`run_replay` orchestration + same-bar guard), `fills/pessimistic.py` (canonical path),
-`runner.py` (`run_one_day` + `run_range`), `reports/verdict.py` (PASS gate),
-`reports/aggregate.py` (descriptive multi-day rollup). CLI in `cli.py` only parses args
-and dispatches.
+`runner.py` (`run_one_day` + `run_range` + `run_tournament`), `reports/verdict.py`
+(PASS gate), `reports/aggregate.py` (descriptive multi-day rollup), `reports/tournament.py`
+(cross-strategy leaderboard). CLI in `cli.py` only parses args and dispatches.
 
 ## Quality gating (v0.2)
 
@@ -112,6 +112,19 @@ prices; pick one with `--strategy`. Registered, all **long-only**: `orb_long_5m`
 registry entry that emits a `TradePlan`; **no multi-strategy *engine*** (each runs
 independently, one trade/day, per-share).
 
+## Tournament (v0.4b)
+
+`tournament` evaluates the **full pre-registered strategy set** over a **decide** window
+and a separate **holdout** window and emits a **descriptive leaderboard** — the
+anti-overfitting layer. A strategy is `carried_forward` only if it **survives both
+windows**, where *survives* = ≥3 traded days, a **strict >50% majority** of traded days
+clear the friction-survival gate, and **0 KILL** (counts-only — no P&L summation). The
+report states how many strategies were tried (**multiple-comparisons caveat**) and emits
+**no winner/validation verdict** (per-day verdicts stand). Deterministic `tournament_hash`.
+It is a thin rollup over `run_range`; it never optimizes, searches, or cherry-picks a
+subset. Evaluate the whole registered set — choosing a subset after peeking is the bias
+this guards against.
+
 ## Dev workflow
 
 - **Python 3.11+. Stdlib-minimal**: argparse, dataclasses, sqlite3, zoneinfo, urllib.
@@ -137,6 +150,7 @@ same-day-lab init-db
 same-day-lab ingest --provider fixture --symbol AAPL --date 2025-05-15
 same-day-lab run     --symbol AAPL --date 2025-05-15 [--strategy orb_long_5m|vwap_reclaim_long|or_fade_long]
 same-day-lab run-range --symbol AAPL --start 2025-07-07 --end 2025-07-11 [--strategy …]   # per-day independent + aggregate
+same-day-lab tournament --symbol AAPL --decide-start D1 --decide-end D2 --holdout-start H1 --holdout-end H2   # honest cross-strategy leaderboard
 same-day-lab report  --symbol AAPL --date 2025-05-15
 same-day-lab reconstruct --symbol AAPL --date 2025-05-15 --time "10:32"   # --time is market tz
 ```
