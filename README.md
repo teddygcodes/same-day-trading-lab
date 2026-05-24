@@ -164,6 +164,24 @@ itself, produce a PASS.
 crossover, verdict, config hash) and excludes volatile provenance, so the same
 fixture + config always reproduces the same hash.
 
+## Strategies
+
+Strategies are **pre-registered hypotheses with fixed rules — never tuned or optimized**
+(searching parameters until something "works" is the trap this lab exists to resist). Each
+emits a generic `TradePlan` (entry trigger + stop + target-R) that the shared, honest fill
+engine prices. Pick one with `--strategy` on `run` / `run-range` (default `orb_long_5m`).
+All are **long-only**:
+
+- **`orb_long_5m`** — opening-range breakout (close above the 5-min OR high; stop = OR low).
+- **`vwap_reclaim_long`** — price reclaims the cumulative session VWAP from below (VWAP
+  computed only from completed bars; stop = lowest low since the open).
+- **`or_fade_long`** — a failed breakdown below the OR low that closes back above it
+  (bear-trap reclaim; stop = the breakdown swing low).
+
+```bash
+same-day-lab run --symbol AAPL --date 2025-06-13 --strategy vwap_reclaim_long
+```
+
 ## Multi-day (run-range)
 
 Replay the same symbol + strategy across a date range, **each day independent** (its own

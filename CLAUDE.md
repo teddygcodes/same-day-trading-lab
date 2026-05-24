@@ -70,7 +70,7 @@ metrics or marketing language to reports.
 ## Architecture (pipeline)
 
 `ingest` (archive raw + hash) → `normalize` → SQLite → `quality` checks → no-lookahead
-`replay` → `strategy/orb_long` (signal only) → `fills` (pessimistic canonical path +
+`replay` → `strategy/*` (registry; emits a `TradePlan`) → `fills` (pessimistic canonical path +
 naive re-pricing) → `fills/sweep` → `reports/writer` (JSON+MD) → `reports/verdict`.
 
 Key modules: `replay/clock.py` + `replay/view.py` (firewall), `replay/__init__.py`
@@ -101,6 +101,17 @@ P&L, equity curve, drawdown, or Sharpe/Sortino, and **no aggregate validation ve
 (per-day verdicts stand). It runs only over ingested days, surfaces missing weekdays, and
 never fabricates (no market-calendar dependency).
 
+## Strategies (v0.4a)
+
+Strategies are **pre-registered hypotheses with fixed rules — never tuned or searched**
+(tuning to make a strategy "work" is the optimizer trap the lab forbids). Each emits a
+generic `TradePlan` (entry trigger + stop + target-R multiple) that the shared fill engine
+prices; pick one with `--strategy`. Registered, all **long-only**: `orb_long_5m`
+(opening-range breakout), `vwap_reclaim_long` (reclaim of the cumulative session VWAP),
+`or_fade_long` (failed-breakdown reclaim of the OR low). Adding a strategy = a small
+registry entry that emits a `TradePlan`; **no multi-strategy *engine*** (each runs
+independently, one trade/day, per-share).
+
 ## Dev workflow
 
 - **Python 3.11+. Stdlib-minimal**: argparse, dataclasses, sqlite3, zoneinfo, urllib.
@@ -124,8 +135,8 @@ never fabricates (no market-calendar dependency).
 pip install -e ".[test]" && pytest          # offline
 same-day-lab init-db
 same-day-lab ingest --provider fixture --symbol AAPL --date 2025-05-15
-same-day-lab run     --symbol AAPL --date 2025-05-15
-same-day-lab run-range --symbol AAPL --start 2025-07-07 --end 2025-07-11   # per-day independent + aggregate
+same-day-lab run     --symbol AAPL --date 2025-05-15 [--strategy orb_long_5m|vwap_reclaim_long|or_fade_long]
+same-day-lab run-range --symbol AAPL --start 2025-07-07 --end 2025-07-11 [--strategy …]   # per-day independent + aggregate
 same-day-lab report  --symbol AAPL --date 2025-05-15
 same-day-lab reconstruct --symbol AAPL --date 2025-05-15 --time "10:32"   # --time is market tz
 ```
